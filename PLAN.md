@@ -72,6 +72,13 @@ The two features offered were library export/import and per-tab autosave.
 * **Library export/import:** the Library modal gained *Export library…* and *Import…*.
 * **Per-tab autosave:** see §3.8 and §3.10.
 
+### Round 10
+> print as pdf only exports hole pages, making it hard to import them into latex. is there a way to make this optional?
+
+Response:
+* A direct vector-PDF writer was added: *PDF file, cropped to drawing*. The page is the drawing's bounding box.
+* Print now has two variants: page = drawing (`@page{size:W H; margin:0}`) and full page.
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)
@@ -296,7 +303,14 @@ Bindings (trajectory ends):
 
 * **SVG:** `renderScene(true)` placed in an off-screen SVG to measure `getBBox`, plus a 16 px margin and a white background rect.
 * **PNG:** the SVG drawn into a canvas at 3×, then `toBlob`.
-* **PDF:** the export SVG is placed in `#print`; `@media print` hides the app; then `window.print()`.
+* **Print:** the export SVG is placed in `#print`; `@media print` hides the app; then `window.print()`. For the "page = drawing" variant, a `<style id=printPageStyle>` sets `@page{size:Wpx Hpx;margin:0}` and fixes the SVG to W×H px. Chrome, Edge and Firefox honour this.
+* **Direct PDF** (`makePDF`):
+  * It parses the export SVG (`DOMParser`). Supported elements: `path` (M/L/C/Z only), `circle` (4 cubics), `rect`, `text`/`tspan`. The saddle-node half disc is therefore drawn with cubics (`halfDiscD`), not an SVG arc.
+  * Coordinates: `cm` = scale 28.3465/50 pt per px (50 px = 1 cm, as in TikZ), with y flipped. MediaBox = export bounding box.
+  * Styles: fill/stroke colours, width, round caps and joins, dashes.
+  * Text: built-in Type1 fonts Times-Roman, Times-Italic (WinAnsi) and Symbol for Greek and maths symbols (`SYMBOLMAP`). Each text run gets `Tm 1 0 0 -1` to undo the flip. Run widths are measured with canvas `measureText` in Times New Roman so that centred labels stay centred. Baseline = y + 0.33·size (SVG `dominant-baseline: central`).
+  * File structure: hand-written objects (catalog, pages, page, uncompressed content stream, 3 fonts, info) and an xref table. Bytes are written via a `Uint8Array`.
+  * Checked with qpdf, pdfinfo, pdftoppm, and `\includegraphics` in pdflatex.
 * **TikZ:**
   * Styles: `traj`, `sep`, `cyc`, `bnd` (line widths converted at 50 px/cm).
   * Béziers become `.. controls .. and ..`; closed paths end in `.. cycle`.

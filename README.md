@@ -94,10 +94,12 @@ The *Consistency* panel lists:
   * A duplicated tab is detected and gets its own slot.
   * The 12 most recent slots are kept.
 * **Export menu:**
+  * **PDF file, cropped to drawing (for LaTeX):** a vector PDF whose page is exactly the drawing plus a small margin. It is made directly, without the print dialog, and can go straight into `\includegraphics`. 50 px of drawing = 1 cm, as in TikZ. Fonts are the standard PDF Times and Symbol, so Greek letters and the label symbols work.
+  * **Print / save as PDF – page = drawing…:** the browser's print dialog with the page size set to the drawing. This works in Chrome, Edge and Firefox; other browsers may ignore the page size.
+  * **Print / save as PDF – full page…:** the drawing scaled onto a normal paper page.
   * SVG
   * PNG (3× resolution)
   * TikZ code (shown in a box to copy, or saved as `.tex`)
-  * Print / save as PDF (prints just the drawing)
 * **TikZ:** needs `\usepackage{tikz}` and `\usetikzlibrary{arrows.meta,decorations.markings}`. 50 px of drawing = 1 cm; change the `x`/`y` options of the `tikzpicture` to rescale.
 
 ## Files in this folder
