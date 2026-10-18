@@ -51,6 +51,11 @@ Response: on iOS all browsers use WebKit, which has no File System Access API, a
 * The `accept` filter was removed from the file input, so iOS does not grey out `.phase.json` files.
 * Drag-and-drop opening.
 
+### Round 7
+> Ok, also create similar fallbacks for android devices, update plan and readme and commit the updates.
+
+Response: Android browsers have no File System Access API either. Downloads go to the shared Downloads folder, which the system file picker behind *Open…* can browse. The iOS save box is now used on Android too (`MOBILE = IOS || ANDROID`), with Android-specific wording. *Download* is the main route there; *Share…* (Drive, Files, e-mail) is shown only if `navigator.canShare({files})` is true.
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)
@@ -280,7 +285,7 @@ Bindings (trajectory ends):
   * Labels: `\node[font=\fontsize{..}{..}\selectfont]` with the raw text.
   * Tested with pdflatex.
 * **File dialogs:** `showSaveFilePicker` / `showOpenFilePicker` (Chrome and Edge; works on `file://`). The handle is kept, so later Saves overwrite the same file. Other browsers fall back to an `<a download>` link (Downloads folder) and an `<input type=file>`. For PNG, the picker is opened **before** rendering, so the user-activation requirement is still met.
-* **iOS** (detected by user agent, or `MacIntel` with touch points > 1): instead of downloading, `writeTarget` opens `#shareModal`. Its *Share…* button calls `navigator.share({files:[File]})`, a fresh user gesture, so the activation requirement is met even after an asynchronous PNG render. The *Download* button falls back to `<a download>`.
+* **iOS and Android** (`IOS`: user agent, or `MacIntel` with touch points > 1; `ANDROID`: `/Android/` in the user agent; `MOBILE = IOS || ANDROID`): when no save picker exists, `writeTarget` opens `#shareModal`. Its hint text `SHARE_HINT` depends on the platform. Its *Share…* button calls `navigator.share({files:[File]})`, a fresh user gesture, so the activation requirement is met even after an asynchronous PNG render. The *Download* button falls back to `<a download>`.
 * **Library:** `localStorage['phaseplane-library']` holds `{name: {date, doc: JSON string}}`; managed in `#libModal`.
 * **Drag-and-drop:** a file dropped on `#stage` is loaded with `loadDoc`.
 

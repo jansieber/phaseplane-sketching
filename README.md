@@ -79,6 +79,9 @@ The *Consistency* panel lists:
 * **iPad / iPhone (any browser):** web pages cannot open a folder dialog there. *Save*, *Save as…* and the exports open a small box instead:
   * **Share… / Save to Files** opens the iOS share sheet; choose *Save to Files* and pick a folder (iCloud Drive, On My iPad, …). *Open…* can read the file back from there.
   * **Download** puts the file into the browser's own downloads area instead.
+* **Android (Chrome, Firefox, …):** web pages cannot open a folder dialog there either. *Save*, *Save as…* and the exports open the same small box:
+  * **Download** saves into the phone's or tablet's *Downloads* folder; *Open…* opens the system file picker, where Downloads (and Google Drive etc.) can be browsed to load it again.
+  * **Share…** sends the file to another app (Google Drive, Files, e-mail, …). It is only shown when the browser supports sharing files.
 * **Library…:** keeps named drawings inside the browser (localStorage) with no files involved, and lists them for opening or deleting. Handy on iPad, but tied to that browser on that device.
 * **Drag and drop:** a `.phase.json` file can be dropped onto the drawing area to open it.
 * **Autosave:** the drawing is also autosaved in the browser (localStorage) and restored when the page is reopened.

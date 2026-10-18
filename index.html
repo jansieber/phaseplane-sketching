@@ -156,8 +156,8 @@ label.chk{display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-sel
 
 <div class="modal" id="shareModal" hidden><div class="box" style="max-width:440px">
   <h2>Save <span id="shareName"></span></h2>
-  <p class="hint">On iPad/iPhone, web pages cannot open a folder dialog. Tap <b>Share…</b> and choose <b>Save to Files</b> to pick a folder (iCloud Drive, On My iPad, …). <b>Download</b> puts it into the browser's own downloads instead.</p>
-  <div class="btns"><button id="shareBtn">Share… / Save to Files</button><button id="shareDl">Download</button><button data-close>Cancel</button></div>
+  <p class="hint" id="shareHint"></p>
+  <div class="btns"><button id="shareBtn">Share…</button><button id="shareDl">Download</button><button data-close>Cancel</button></div>
 </div></div>
 
 <div class="modal" id="libModal" hidden><div class="box" style="max-width:560px">
@@ -1117,12 +1117,15 @@ async function pickTarget(name,desc,mime,ext){
     catch(e){if(e&&e.name==='AbortError')return null;console.warn(e);}}
   return 'download';}
 const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const ANDROID=/Android/i.test(navigator.userAgent),MOBILE=IOS||ANDROID;
+const SHARE_HINT=IOS?'On iPad/iPhone, web pages cannot open a folder dialog. Tap <b>Share…</b> and choose <b>Save to Files</b> to pick a folder (iCloud Drive, On My iPad, …). <b>Download</b> puts it into the browser\'s own downloads instead.'
+  :'On Android, web pages cannot open a folder dialog. <b>Download</b> saves the file into the <b>Downloads</b> folder, where <b>Open…</b> can find it again. <b>Share…</b> sends it to another app instead, e.g. Google Drive, Files or e-mail.';
 let pendingShare=null;
 function shareFile(){const {name,blob}=pendingShare;return new File([blob],name,{type:blob.type||'application/octet-stream'});}
-function offerShare(name,blob){pendingShare={name,blob};$('shareName').textContent=name;
+function offerShare(name,blob){pendingShare={name,blob};$('shareName').textContent=name;$('shareHint').innerHTML=SHARE_HINT;
   let ok=false;try{ok=!!(navigator.canShare&&navigator.canShare({files:[shareFile()]}));}catch(e){}
   $('shareBtn').hidden=!ok;openModal('shareModal');}
-async function writeTarget(tg,name,blob){if(tg==='download'){if(IOS){offerShare(name,blob);return 'the share sheet';}download(name,blob);return 'your Downloads folder';}
+async function writeTarget(tg,name,blob){if(tg==='download'){if(MOBILE){offerShare(name,blob);return 'the share sheet';}download(name,blob);return 'your Downloads folder';}
   const w=await tg.createWritable();await w.write(blob);await w.close();return tg.name;}
 async function saveNative(as){
   try{const tg=(!as&&fileHandle)?fileHandle:await pickTarget(baseName()+'.phase.json','Phase portrait','application/json','.json');if(!tg)return;
