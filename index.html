@@ -165,7 +165,8 @@ label.chk{display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-sel
   <p class="hint">Drawings kept here survive reloads but live only in this browser on this device. Use Save for real files.</p>
   <div class="row"><span>Name</span><input type="text" id="libName"><button id="libStore">Store current drawing</button></div>
   <ul id="libList"></ul>
-  <div class="btns"><button data-close>Close</button></div>
+  <div class="btns"><button id="libExport" title="Save all stored drawings as one backup file">Export library…</button><button id="libImport" title="Add drawings from a library backup or from .phase.json files">Import…</button><button data-close>Close</button></div>
+  <input type="file" id="libInput" multiple hidden>
 </div></div>
 
 <div class="modal" id="helpModal" hidden><div class="box">
@@ -730,7 +731,28 @@ function commit(before,label,opts={}){
 function resetKeys(){st.valid=validate();st.hardKeys=new Set(st.valid.hard.map(h=>h.key));}
 function undo(){if(!st.undo.length)return;st.redo.push(snapshot());doc=JSON.parse(st.undo.pop());resetKeys();autosave();st.panelDirty=true;setMsg('Undo');refresh();}
 function redo(){if(!st.redo.length)return;st.undo.push(snapshot());doc=JSON.parse(st.redo.pop());resetKeys();autosave();st.panelDirty=true;setMsg('Redo');refresh();}
-function autosave(){try{localStorage.setItem('phaseplane-autosave',snapshot());}catch(e){}}
+/* Autosave: one slot per browser tab (tab id kept in sessionStorage, so a reload restores the same tab's
+   drawing). A brand-new tab starts from the most recently saved slot of any tab, then writes its own slot.
+   A duplicated tab inherits the id; a BroadcastChannel query detects that and gives it a fresh id. */
+const AUTOKEY='phaseplane-autosave:',INST=Math.random().toString(36).slice(2,10);
+let TAB=null;try{TAB=sessionStorage.getItem('phaseplane-tab');}catch(e){}
+const freshTab=!TAB;
+function newTabId(){TAB=Math.random().toString(36).slice(2,10);try{sessionStorage.setItem('phaseplane-tab',TAB);}catch(e){}}
+if(!TAB)newTabId();
+const BC=('BroadcastChannel' in window)?new BroadcastChannel('phaseplane-tabs'):null;
+if(BC){BC.onmessage=e=>{const m=e.data||{};
+    if(m.q&&m.q===TAB&&m.from!==INST)BC.postMessage({taken:TAB,to:m.from});
+    if(m.taken&&m.to===INST&&m.taken===TAB){newTabId();autosave();}};
+  try{BC.postMessage({q:TAB,from:INST});}catch(e){}}
+function autosaveSlots(){const out=[];try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);
+    if(k&&k.startsWith(AUTOKEY)){try{const v=JSON.parse(localStorage.getItem(k));if(v&&v.doc)out.push({k,date:v.date||0,doc:v.doc});}catch(e){}}}}catch(e){}
+  return out.sort((a,b)=>b.date-a.date);}
+function autosave(){try{localStorage.setItem(AUTOKEY+TAB,JSON.stringify({date:Date.now(),doc:snapshot()}));
+    for(const x of autosaveSlots().slice(12))localStorage.removeItem(x.k);}catch(e){}}
+function restoreAutosave(){const slots=autosaveSlots();let src=freshTab?null:slots.find(x=>x.k===AUTOKEY+TAB);
+  if(!src&&slots.length)src=slots[0];let txt=src&&src.doc;
+  if(!txt){try{txt=localStorage.getItem('phaseplane-autosave');}catch(e){}}
+  if(!txt)return;try{const o=JSON.parse(txt);if(o&&Array.isArray(o.elements))doc=Object.assign(newDoc(),o);}catch(e){}}
 
 /* =====================================================================
    Tools
@@ -1122,7 +1144,7 @@ const SHARE_HINT=IOS?'On iPad/iPhone, web pages cannot open a folder dialog. Tap
   :'On Android, web pages cannot open a folder dialog. <b>Download</b> saves the file into the <b>Downloads</b> folder, where <b>Open…</b> can find it again. <b>Share…</b> sends it to another app instead, e.g. Google Drive, Files or e-mail.';
 let pendingShare=null;
 function shareFile(){const {name,blob}=pendingShare;return new File([blob],name,{type:blob.type||'application/octet-stream'});}
-function offerShare(name,blob){pendingShare={name,blob};$('shareName').textContent=name;$('shareHint').innerHTML=SHARE_HINT;
+function offerShare(name,blob){closeModals();pendingShare={name,blob};$('shareName').textContent=name;$('shareHint').innerHTML=SHARE_HINT;
   let ok=false;try{ok=!!(navigator.canShare&&navigator.canShare({files:[shareFile()]}));}catch(e){}
   $('shareBtn').hidden=!ok;openModal('shareModal');}
 async function writeTarget(tg,name,blob){if(tg==='download'){if(MOBILE){offerShare(name,blob);return 'the share sheet';}download(name,blob);return 'your Downloads folder';}
@@ -1153,6 +1175,26 @@ $('libStore').onclick=()=>{const n=$('libName').value.trim()||'untitled';const L
 $('libList').addEventListener('click',e=>{const o=e.target.dataset.lopen,d=e.target.dataset.ldel;const L=libGet();
   if(o!=null&&L[o]){try{loadDoc(JSON.parse(L[o].doc));fileHandle=null;fileName=o+'.phase.json';updateTitle();closeModals();setMsg('Opened “'+o+'” from the library');}catch(err){setMsg('Could not open: '+err.message,true);}}
   if(d!=null&&confirm('Delete “'+d+'” from this browser?')){delete L[d];try{localStorage.setItem(LIBKEY,JSON.stringify(L));}catch(err){}renderLib();}});
+$('libExport').onclick=async()=>{const L=libGet();if(!Object.keys(L).length){setMsg('The library is empty',true);return;}
+  const name='phase-library-'+new Date().toISOString().slice(0,10)+'.json';
+  try{const tg=await pickTarget(name,'Phase portrait library','application/json','.json');if(!tg)return;
+    const blob=new Blob([JSON.stringify({format:'phaseplane-library',version:1,exported:new Date().toISOString(),items:L},null,1)],{type:'application/json'});
+    const where=await writeTarget(tg,name,blob);if(where!=='the share sheet')setMsg('Library exported to '+where);}
+  catch(e){setMsg('Export failed: '+e.message,true);}};
+$('libImport').onclick=()=>$('libInput').click();
+$('libInput').addEventListener('change',async e=>{const L=libGet();let added=0,same=0,bad=0;
+  for(const f of [...e.target.files]){let o;try{o=JSON.parse(await f.text());}catch(err){bad++;continue;}
+    let items={};
+    if(o&&o.format==='phaseplane-library'&&o.items&&typeof o.items==='object')items=o.items;
+    else if(o&&Array.isArray(o.elements))items={[f.name.replace(/\.phase\.json$|\.json$/i,'')||'untitled']:{date:f.lastModified||Date.now(),doc:JSON.stringify(o)}};
+    else{bad++;continue;}
+    for(const [n,v] of Object.entries(items)){
+      try{if(!v||typeof v.doc!=='string'||!Array.isArray(JSON.parse(v.doc).elements)){bad++;continue;}}catch(err){bad++;continue;}
+      let name=n;if(L[name]){if(L[name].doc===v.doc){same++;continue;}let i=2;while(L[`${n} (${i})`])i++;name=`${n} (${i})`;}
+      L[name]={date:v.date||Date.now(),doc:v.doc};added++;}}
+  e.target.value='';
+  try{localStorage.setItem(LIBKEY,JSON.stringify(L));}catch(err){setMsg('Browser storage is full or unavailable',true);return;}
+  renderLib();setMsg(`Imported ${added} drawing${added===1?'':'s'}`+(same?`, ${same} already present`:'')+(bad?`, ${bad} unreadable`:''),!!bad&&!added);});
 /* drag a .phase.json file onto the drawing to open it */
 $('stage').addEventListener('dragover',e=>{e.preventDefault();});
 $('stage').addEventListener('drop',async e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(!f)return;
@@ -1273,7 +1315,7 @@ function exampleDoc(){const save=doc;doc=newDoc();
 
 /* ---------- start ---------- */
 buildTools();layoutTools();loadPrefs();
-try{const s=localStorage.getItem('phaseplane-autosave');if(s){const o=JSON.parse(s);if(o&&Array.isArray(o.elements))doc=Object.assign(newDoc(),o);}}catch(e){}
+restoreAutosave();
 st.view={k:0.8,x:-svg.clientWidth/2/0.8,y:-svg.clientHeight/2/0.8};
 if(!doc.arrowScale)doc.arrowScale=1.3;
 resetKeys();st.panelDirty=true;refresh();updateTitle();if(doc.elements.length)fit();

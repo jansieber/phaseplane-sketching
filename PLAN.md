@@ -56,6 +56,22 @@ Response: on iOS all browsers use WebKit, which has no File System Access API, a
 
 Response: Android browsers have no File System Access API either. Downloads go to the shared Downloads folder, which the system file picker behind *Open…* can browse. The iOS save box is now used on Android too (`MOBILE = IOS || ANDROID`), with Android-specific wording. *Download* is the main route there; *Share…* (Drive, Files, e-mail) is shown only if `navigator.canShare({files})` is true.
 
+### Round 8
+> How does "Library" behave if index.html is loaded from different sources into different tabs?
+
+Answer: localStorage is per origin (protocol + host + port), not per path.
+* Tabs from the same site share the Library; different sites are isolated.
+* `file://` copies are shared in Chrome; Firefox may isolate local files.
+* Private windows get a temporary store; different browsers, profiles and devices never share.
+* The single autosave slot and the preferences were shared per origin, so two tabs could overwrite each other's autosave.
+
+### Round 9
+> Yes, both features are useful. update allf files and git commit
+
+The two features offered were library export/import and per-tab autosave.
+* **Library export/import:** the Library modal gained *Export library…* and *Import…*.
+* **Per-tab autosave:** see §3.8 and §3.10.
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)
@@ -248,7 +264,11 @@ Bindings (trajectory ends):
   * Move, scale and rotate restore the document from a `structuredClone` of the base and apply an affine map each frame (`affine(el, M)`). This maps nodes and handles, transforms equilibrium angles and spread, flips boundary `dir` and spiral sense when `det < 0`, and leaves glyph sizes unchanged.
   * Scale handles: corners are uniform (`Shift` free, `Alt` about the centre); edges scale one axis; a rotate knob sits above the box.
 * **Undo/redo:** JSON snapshot stacks (up to 300 entries).
-* **Autosave:** `localStorage['phaseplane-autosave']`.
+* **Autosave, per tab:**
+  * Each tab has an id `TAB` stored in `sessionStorage['phaseplane-tab']`, which survives reloads. The slot is `localStorage['phaseplane-autosave:'+TAB]` = `{date, doc}`.
+  * On startup, a tab that already has an id restores its own slot. A fresh tab restores the newest slot of any tab, falling back to the legacy key `phaseplane-autosave`, then writes its own slot from then on.
+  * Duplicated tabs inherit `sessionStorage`. To detect this, each page posts `{q:TAB, from:INST}` on `BroadcastChannel('phaseplane-tabs')`; a live tab owning that id replies `{taken, to}`, and the newcomer takes a fresh id.
+  * Only the 12 newest slots are kept.
 * **Preferences:** `localStorage['phaseplane-prefs2']` stores grid, snap, magnet, refuse and smoothing.
 * **Keyboard shortcuts** are ignored while focus is in a text, number or select input (checkboxes blur themselves on change so shortcuts keep working).
 
@@ -287,6 +307,9 @@ Bindings (trajectory ends):
 * **File dialogs:** `showSaveFilePicker` / `showOpenFilePicker` (Chrome and Edge; works on `file://`). The handle is kept, so later Saves overwrite the same file. Other browsers fall back to an `<a download>` link (Downloads folder) and an `<input type=file>`. For PNG, the picker is opened **before** rendering, so the user-activation requirement is still met.
 * **iOS and Android** (`IOS`: user agent, or `MacIntel` with touch points > 1; `ANDROID`: `/Android/` in the user agent; `MOBILE = IOS || ANDROID`): when no save picker exists, `writeTarget` opens `#shareModal`. Its hint text `SHARE_HINT` depends on the platform. Its *Share…* button calls `navigator.share({files:[File]})`, a fresh user gesture, so the activation requirement is met even after an asynchronous PNG render. The *Download* button falls back to `<a download>`.
 * **Library:** `localStorage['phaseplane-library']` holds `{name: {date, doc: JSON string}}`; managed in `#libModal`.
+  * **Export** writes `{format:'phaseplane-library', version:1, exported, items:{…}}` via `pickTarget`/`writeTarget`, so it also goes through the iOS/Android save box. `offerShare` closes other modals first.
+  * **Import** (`#libInput`, multiple files) accepts library files or single drawings and validates that each `doc` parses with an `elements` array. Identical entries are skipped; name clashes get ` (2)`, ` (3)`, ….
+  * Storage scope: per origin (see Round 8).
 * **Drag-and-drop:** a file dropped on `#stage` is loaded with `loadDoc`.
 
 ---

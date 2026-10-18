@@ -83,8 +83,16 @@ The *Consistency* panel lists:
   * **Download** saves into the phone's or tablet's *Downloads* folder; *Open…* opens the system file picker, where Downloads (and Google Drive etc.) can be browsed to load it again.
   * **Share…** sends the file to another app (Google Drive, Files, e-mail, …). It is only shown when the browser supports sharing files.
 * **Library…:** keeps named drawings inside the browser (localStorage) with no files involved, and lists them for opening or deleting. Handy on iPad, but tied to that browser on that device.
+  * **Export library…** saves all stored drawings as one backup file (`phase-library-DATE.json`).
+  * **Import…** adds drawings from such a backup, or from one or more `.phase.json` files. Identical entries are skipped, and name clashes get a suffix such as `name (2)`.
+  * Use export and import to move a library between browsers, devices, or copies of the tool loaded from different places.
+  * **Which copies share a library:** browser storage belongs to an *origin* (protocol + host + port), not to a folder or file. All tabs showing the tool from the same website share one library; copies on different websites each have their own. Copies opened from disk share one library in Chrome, while Firefox may keep local files separate. Private windows get a temporary library that is deleted when the window closes. Settings (grid, snap, magnet, refuse crossings, smoothing) are shared per origin in the same way.
 * **Drag and drop:** a `.phase.json` file can be dropped onto the drawing area to open it.
-* **Autosave:** the drawing is also autosaved in the browser (localStorage) and restored when the page is reopened.
+* **Autosave:** each browser tab autosaves its drawing in its own slot, so two tabs never overwrite each other's restore point.
+  * Reloading a tab restores that tab's drawing.
+  * A newly opened tab starts from the most recently autosaved drawing of any tab, then keeps its own slot.
+  * A duplicated tab is detected and gets its own slot.
+  * The 12 most recent slots are kept.
 * **Export menu:**
   * SVG
   * PNG (3× resolution)
