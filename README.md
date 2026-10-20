@@ -2,7 +2,7 @@
 
 A browser tool for sketching qualitative phase portraits of planar flows, as used in a dynamical systems course. The tool checks that the picture is topologically consistent, for example that trajectories do not cross and that every attachment respects the direction of the flow.
 
-**▶ [Open the app](https://jansieber.github.io/phaseplane-drawing/)** – runs in any modern browser, including iPad and Android tablets.
+**▶ [Open the app](https://jansieber.github.io/phaseplane-sketching/)** – runs in any modern browser, including iPad and Android tablets.
 
 ![Example: heteroclinic cycle between two saddles around an unstable focus](fish_phase.png)
 
