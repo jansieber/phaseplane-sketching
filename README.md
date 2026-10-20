@@ -4,7 +4,7 @@ A browser tool for sketching qualitative phase portraits of planar flows, as use
 
 **▶ [Open the app](https://jansieber.github.io/phaseplane-sketching/)** – runs in any modern browser, including iPad and Android tablets.
 
-![Example: heteroclinic cycle between two saddles around an unstable focus](fish_phase.png)
+<img src="fish_phase.png" alt="Example phase portrait" width="50%"/>
 
 ## Features
 
