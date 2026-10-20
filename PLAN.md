@@ -1,6 +1,6 @@
 # Phase Portrait Sketcher — specification, plan and implementation notes
 
-This file records the requirements as given, the feasibility assessment, the decisions taken, and enough of the design to regenerate the tool from scratch, for example by another AI instance or developer. The current implementation is `index.html` (about 1,250 lines, one self-contained file). User-facing help is in `README.md`.
+This file records the requirements as given, the feasibility assessment, the decisions taken, and enough of the design to regenerate the tool from scratch, for example by another AI instance or developer. The current implementation is `index.html` (about 1,250 lines, one self-contained file). User-facing help is in `HELP.md`; `README.md` is a short overview for the GitHub landing page.
 
 ---
 
@@ -108,6 +108,14 @@ Implemented as B + 1 + 2 (§3.11).
 > One further feature request: to demonstrate separatrix splitting, it is useful to also split trajectories at a node. After selecting a node, one should be able to split the trajectory there.
 
 Implemented as `splitAtNode()`: key `X`, plus a panel button shown when an inner node is selected (see §3.8).
+
+### Round 15
+> I plan to push the code to github. For this the long README.md is too long for the landing page intro. So, move README.md to (eg) HELP.md, and provide a short summary in README, with a github compatible link to the github pages link of the html. Is it still ok/suitable to call the main file index.html?.
+
+Changes:
+* The full help moved to `HELP.md` (via `git mv`, so its history is kept).
+* `README.md` is now a short overview: a link to the GitHub Pages site, a screenshot (`fish_phase.png`), a feature list, links to HELP, PLAN and the examples, and Pages setup instructions.
+* `index.html` is kept as the file name: GitHub Pages serves it at the site root.
 
 ---
 
