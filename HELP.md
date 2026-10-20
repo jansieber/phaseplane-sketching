@@ -122,7 +122,7 @@ The *Consistency* panel lists:
   * SVG
   * PNG (3× resolution)
   * TikZ code (shown in a box to copy, or saved as `.tex`)
-* **TikZ:** needs `\usepackage{tikz}` and `\usetikzlibrary{arrows.meta,decorations.markings}`. 50 px of drawing = 1 cm; change the `x`/`y` options of the `tikzpicture` to rescale.
+* **TikZ:** needs only `\usepackage{tikz}`; arrowheads are written as small filled shapes, so no TikZ libraries are required. 50 px of drawing = 1 cm; change the `x`/`y` options of the `tikzpicture` to rescale.
 
 ## Files in this folder
 

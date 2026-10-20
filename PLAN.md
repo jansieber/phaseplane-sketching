@@ -117,6 +117,13 @@ Changes:
 * `README.md` is now a short overview: a link to the GitHub Pages site, a screenshot (`fish_phase.png`), a feature list, links to HELP, PLAN and the examples, and Pages setup instructions.
 * `index.html` is kept as the file name: GitHub Pages serves it at the site root.
 
+### Round 16
+> When exporting a figure as tikz tex and compiling I get an error ERROR: Dimension too large. […] l.14 ...764) and (-7.577,1.682) .. (-7.207,1.638);
+
+Cause: a numerical weakness of PGF's `decorations.markings`. For some curves, certain mark positions overflow. In the reported case positions 0.5, 0.55 and 0.8 failed, even with a plain dot as the mark, while each Bézier segment alone was fine.
+
+Fix: the TikZ export no longer uses decorations. Arrowheads are written as `\fill` polygons computed by `arrowPoly`, the same shape and position as on screen, so the export needs no TikZ libraries.
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)
@@ -364,7 +371,7 @@ Bindings (trajectory ends):
 * **TikZ:**
   * Styles: `traj`, `sep`, `cyc`, `bnd` (line widths converted at 50 px/cm).
   * Béziers become `.. controls .. and ..`; closed paths end in `.. cycle`.
-  * Arrows use `decorations.markings` with `Stealth[length,width]` at the same arc-length fractions as on screen (`\arrowreversed` for cycles with `dir = −1`).
+  * Arrowheads are explicit filled polygons, `\fill (tip) -- (a1) -- (notch) -- (a2) -- cycle;`, from `arrowPoly(p, t, L, W)`. Positions are the same arc-length points as on screen; boundary marks are a line plus a polygon. This avoids `decorations.markings`, which gives "Dimension too large" on some curves, so only `\usepackage{tikz}` is needed.
   * Spirals and semi-stable offsets are polylines (`--`). `plot[smooth]` caused "Dimension too large" with dense points.
   * Labels: `\node[font=\fontsize{..}{..}\selectfont]` with the raw text.
   * Tested with pdflatex.
