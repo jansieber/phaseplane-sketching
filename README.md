@@ -21,7 +21,3 @@ A browser tool for sketching qualitative phase portraits of planar flows, as use
 * [HELP.md](HELP.md) – user guide: tools, keyboard shortcuts, consistency checks, files and export.
 * [PLAN.md](PLAN.md) – requirements, design decisions and implementation notes.
 * [phaseplane-examples.json](phaseplane-examples.json) – example drawings; load them via *Library… → Import…*.
-
-## Hosting on GitHub Pages
-
-In the repository, go to *Settings → Pages → Build and deployment*. Choose *Deploy from a branch*, branch `main`, folder `/ (root)`. The app is then served at `https://<user>.github.io/<repository>/`.
