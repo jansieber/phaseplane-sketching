@@ -165,6 +165,20 @@ Answer: only barely.
   * Every pair in the palette now stays ≥ 10.9 under all three deficiencies. The weakest pair is blue vs teal under tritanopia.
 * Colours already stored in files are unchanged; they simply show as a custom colour in the panel.
 
+### Round 20
+> The basin filling interface behaves counterintuitively (to me). I prefer having the selected color as "currently active for clicks that follow" such that only clicks into regions change to the currently active color. At the moment, clicking on another color in the tool changes the last selected basin. The "delete" should also behave like a "currently active color for following clicks" (aka "no color").
+> The option "bounded by" basin boundary is too smart (behaves confusingly when connecting loops are present). Bounded by all curves feels simpler, even though one has to perform several clicks for one basin.
+> Commit change to git at the end
+
+Changes:
+* The fill tool panel shows only an **active colour** row. It has the seven presets, a colour picker and an eraser swatch *no colour* (`st.fillColor = 'none'`). Choosing a colour only sets `st.fillColor` and never touches existing fills.
+* Taps behave as follows:
+  * on empty space, a new fill in the active colour;
+  * on a fill, recolour it (or nothing if it already has that colour);
+  * with *no colour*, remove the fill under the tap. A freehand drag with *no colour* is ignored.
+* The fill tool no longer selects the fills it creates, and entering the tool clears the selection. Fills are edited further with the Select tool.
+* The "bounded by" option and the *basin boundaries* mode are removed: `fillBarriers()` always uses every trajectory, cycle, boundary and stub, with trajectory ends on a cycle still extended onto it. The `fillBound` preference is gone.
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)
@@ -490,7 +504,7 @@ Bindings (trajectory ends):
 * In the editor an unselected fill has `pointer-events="none"`, so marquee drags work on top of fills. A selected fill is hittable, so it can be dragged.
 * A click without a drag on empty space selects the topmost fill containing the point (`fillAt`, at marquee `pointerup`).
 
-**Fill tool** (`st.fillColor`, `st.fillBound` ∈ {basin, all}, both stored in preferences).
+**Fill tool** (`st.fillColor` stored in preferences; `'none'` = eraser since Round 20; the *basin* mode described below was removed in Round 20).
 * A drag of more than 40 px makes a freehand fill (`closedNodes`). A tap calls `bucketFill(p)`:
   1. If `fillAt(p)` hits an existing fill, recolour it.
   2. Raster window = visible area ∩ (union bounding box of non-fill, non-label elements + 24). Scale `s = min(1600/max side, max(2, 1.5·zoom))` canvas px per world unit.

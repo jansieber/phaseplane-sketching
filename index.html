@@ -85,6 +85,8 @@ label.chk{display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-sel
 .sw{width:22px;height:22px;padding:0;border-radius:50%;border:1px solid #aab1bb;background:var(--c);position:relative;cursor:pointer;display:inline-block}
 .sw.on{outline:2px solid var(--accent);outline-offset:1px}
 .sw.def::after{content:"";position:absolute;inset:6px;border-radius:50%;background:#fff;opacity:.85}
+.sw.erase{background:#fff}
+.sw.erase::after{content:"";position:absolute;left:50%;top:2px;bottom:2px;width:2px;margin-left:-1px;background:#d4351c;transform:rotate(45deg)}
 .sw.pick{background:conic-gradient(#d4351c,#c26b00,#e8d200,#1a7f5a,#1f6feb,#8250df,#d4351c)}
 .sw.pick.on{background:var(--c)}
 .sw.pick input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;border:0;padding:0}
@@ -202,7 +204,7 @@ hr.sepl{border:0;border-top:1px solid var(--line);margin:10px -12px}
   <tr><td><b>Equilibria</b> <kbd>1</kbd>–<kbd>4</kbd></td><td>Sink, source, saddle (4 terminals: unstable separatrices point out, stable ones point in), saddle-node (only when structural stability is off).</td></tr>
   <tr><td><b>Periodic orbit</b> <kbd>C</kbd></td><td>Click for a default ellipse, or draw a closed loop. Stable = solid, unstable = dashed, semi-stable = solid with a dashed shadow on the repelling side.</td></tr>
   <tr><td><b>Boundary</b> <kbd>B</kbd></td><td>Draw a curve the flow crosses in one direction (shown by small arrows). A closed curve is created as inflowing (trapping region); flip it in the properties panel.</td></tr>
-  <tr><td><b>Background fill</b> <kbd>F</kbd></td><td>Tap inside a region to colour it, e.g. a basin of attraction. The region is bounded by the <i>basin boundaries</i> (stable separatrices, unstable and semi-stable orbits, boundaries) or by all curves – chosen in the right panel. Unclosed regions are cut at the edge of the view/drawing. Drag instead of tapping to draw a shape by hand; tap an existing fill to recolour it. Fills are pure decoration: they lie under everything and are never checked. In Select mode, click inside a fill to select it.</td></tr>
+  <tr><td><b>Background fill</b> <kbd>F</kbd></td><td>Choose the <b>active colour</b> in the right panel, then tap inside regions to fill them, e.g. the parts of a basin of attraction. The active colour applies to the taps that follow; tapping an existing fill recolours it, and with <b>no colour</b> (the crossed-out swatch) a tap removes a fill. A region is bounded by all curves, so a basin may need several taps; unclosed regions are cut at the edge of the view/drawing. Drag instead of tapping to draw a shape by hand. Fills are pure decoration: they lie under everything and are never checked. In Select mode, click inside a fill to select it.</td></tr>
   <tr><td><b>Region</b> <kbd>G</kbd></td><td>Drag a rectangle; a small bar offers <b>Copy image</b> (exactly that rectangle, as a picture for other apps) and <b>Copy sketch</b> (the elements lying completely inside, for pasting into this tool).</td></tr>
   <tr><td><b>Label</b> <kbd>L</kbd></td><td>Click to place text. Inside <code>$…$</code>: <code>_</code> subscript, <code>^</code> superscript, <code>\alpha</code> etc.</td></tr>
   </table>
@@ -376,7 +378,7 @@ const AS=()=>(doc&&doc.arrowScale)||1;
 let doc=newDoc();
 const st={tool:'select',sel:new Set(),selNode:null,drag:null,pen:null,view:{x:-500,y:-350,k:1},space:false,
   refuse:false,smoothing:'medium',grid:true,snapGrid:false,magnet:true,flash:null,valid:{hard:[],warn:[]},hardKeys:new Set(),
-  undo:[],redo:[],msg:'',msgBad:false,mouse:null,panelDirty:true,fillColor:'#dbe9ff',fillBound:'basin'};
+  undo:[],redo:[],msg:'',msgBad:false,mouse:null,panelDirty:true,fillColor:'#dbe9ff'};
 const byId=id=>doc.elements.find(e=>e.id===id);
 const fakeTraj=p=>({type:'traj',nodes:[{x:p.x,y:p.y,ix:0,iy:0,ox:0,oy:0},{x:p.x,y:p.y,ix:0,iy:0,ox:0,oy:0}],start:null,end:null});
 const isPath=el=>el&&(el.type==='traj'||el.type==='cycle'||el.type==='boundary');
@@ -852,7 +854,7 @@ function buildTools(){const box=$('tools');box.innerHTML='';
     b.innerHTML=`<svg viewBox="0 0 28 28">${ICON[t[0]]}</svg><span class="k">${t[2]}</span>`;
     b.onclick=()=>setTool(t[0]);box.appendChild(b);}}
 function setTool(t){if(t!=='region')st.region=null;if(t==='sn'&&doc.structStable){setMsg('Saddle-nodes need “Structurally stable” switched off',true);return;}
-  if(st.pen)finishPen(true);st.tool=t;st.magnets=[];st.lastDown=null;
+  if(st.pen)finishPen(true);st.tool=t;st.magnets=[];st.lastDown=null;if(t==='fill'){st.sel.clear();st.selNode=null;}
   svg.style.cursor=t==='pan'?'grab':t==='select'?'default':'crosshair';st.panelDirty=true;refresh();}
 function updateToolbar(){for(const b of document.querySelectorAll('#tools button')){b.classList.toggle('on',b.dataset.tool===st.tool);
     if(b.dataset.tool==='sn')b.disabled=doc.structStable;}
@@ -862,7 +864,7 @@ const TOOLHINT={region:'Drag a rectangle, then choose Copy image or Copy sketch'
   traj:'Draw a trajectory in the direction of the flow; ends snap to targets',pen:'Click / click-drag to add nodes; finish with ✓, Enter, a double-click, a tap on the last node, or by ending on a snap target',
   sink:'Click to place a sink',source:'Click to place a source',saddle:'Click to place a saddle',sn:'Click to place a saddle-node',
   cycle:'Click for an ellipse, or draw a closed loop',boundary:'Draw a boundary curve (close the loop for a trapping region)',label:'Click to place a label',
-  fill:'Tap inside a region to fill it (bounded as set on the right), or draw a closed shape; tap a fill to recolour it'};
+  fill:'Tap inside a region to fill it with the active colour (tap a fill to recolour it; with “no colour” a tap removes it); drag to draw a shape'};
 function renderStatus(){$('stTool').textContent=TOOLHINT[st.tool]||'';const m=$('stMsg');m.textContent=st.msg||'';m.className='msg'+(st.msgBad?' bad':'');
   $('stPos').textContent=st.mouse?`x ${Math.round(st.mouse.x)}  y ${Math.round(-st.mouse.y)}`:'';}
 
@@ -1031,8 +1033,9 @@ function finishStroke(d){const k=st.view.k,pts=d.pts;const before=snapshot();
   if(d.tool==='fill'){
     if(tot*k<12){bucketFill(pts[0]);return;}
     if(tot*k<40){refresh();return;}
-    const el=mkFill(closedNodes(pts),null,st.fillColor);doc.elements.push(el);st.sel=new Set([el.id]);
-    commit(before,'Fill created – change its colour on the right; it never takes part in the consistency checks');return;}
+    if(st.fillColor===ERASE){setMsg('“No colour” is active: tap a fill to remove it, or pick a colour to draw a fill',true);refresh();return;}
+    const el=mkFill(closedNodes(pts),null,st.fillColor);doc.elements.push(el);
+    commit(before,'Fill created');return;}
   if(d.tool==='cycle'){let el;
     if(tot*k<12){const q=gsnap(pts[0]);el=mkCycle(ellipseNodes(q.x,q.y,60,42),'stable');}
     else el=mkCycle(closedNodes(pts),'stable');
@@ -1054,18 +1057,14 @@ function finishStroke(d){const k=st.view.k,pts=d.pts;const before=snapshot();
    Raster approach: the barrier curves are drawn into an off-screen canvas, the region around the tapped point is flood-filled,
    grown under the barrier lines, and its outline is traced and fitted with closed Bézier paths (outer ring + holes).
    The result is a plain decorative element; nothing is checked afterwards. */
-function isStableSep(tr){const b=tr.end;if(!b||!b.port)return false;const tg=byId(b.el);if(!tg||tg.type!=='eq')return false;
-  const r=portRole(tg,b.port);return !!(r&&r.sep&&r.role==='end');}
-function fillBarriers(mode){const out=[];/* list of polylines (world coordinates) */
+function fillBarriers(){const out=[];/* every curve bounds a fill: list of polylines (world coordinates) */
   for(const el of doc.elements){
-    if(el.type==='traj'){if(!(mode==='all'||isStableSep(el)))continue;let pts=flatten(el).pts.slice();
+    if(el.type==='traj'){let pts=flatten(el).pts.slice();
       /* ends bound to an orbit sit CYC_OFF away from it: close that gap */
       const onC=w=>{const bd=el[w];const tg=bd&&byId(bd.el);return tg&&tg.type==='cycle'?pathPt(tg,bd.t):null;};
       const a=onC('start'),z=onC('end');if(a)pts.unshift(a);if(z)pts.push(z);out.push(pts);}
-    else if(el.type==='cycle'){if(mode==='all'||el.stability!=='stable')out.push(flatten(el).pts);}
-    else if(el.type==='boundary')out.push(flatten(el).pts);
-    else if(el.type==='eq')for(const q of eqPorts(el))if(q.dir){const r=portRole(el,q.port);
-      if(mode==='all'||(r&&r.sep&&r.role==='end'))out.push([{x:el.x,y:el.y},q.pos]);}}
+    else if(el.type==='cycle'||el.type==='boundary')out.push(flatten(el).pts);
+    else if(el.type==='eq')for(const q of eqPorts(el))if(q.dir)out.push([{x:el.x,y:el.y},q.pos]);}
   return out;}
 function fillAt(p){/* topmost existing fill containing p */
   const fs=doc.elements.filter(e=>e.type==='fill');
@@ -1098,10 +1097,13 @@ function loopToNodes(loop,toW,eps){/* staircase → smooth → simplified → B�
   for(let i=0;i<n;i++){const a=vnorm(vsub(w[i],w[(i-1+n)%n])),b=vnorm(vsub(w[(i+1)%n],w[i]));
     if(vdot(a,b)<Math.cos(55*D2R)){N[i].ix=N[i].iy=N[i].ox=N[i].oy=0;N[i].smooth=false;}}
   return N;}
+const ERASE='none';/* st.fillColor===ERASE: taps remove fills */
 function bucketFill(p){
   const hit=fillAt(p);
-  if(hit){const before=snapshot();if(hit.color===st.fillColor){st.sel=new Set([hit.id]);st.panelDirty=true;refresh();setMsg('This region is already filled with that colour – pick another colour on the right to recolour it');return;}
-    hit.color=st.fillColor;st.sel=new Set([hit.id]);commit(before,'Fill recoloured');return;}
+  if(st.fillColor===ERASE){if(!hit){setMsg('No fill here to remove',true);return;}
+    const before=snapshot();doc.elements=doc.elements.filter(e=>e!==hit);st.sel.delete(hit.id);commit(before,'Fill removed');return;}
+  if(hit){if((hit.color||'').toLowerCase()===st.fillColor.toLowerCase()){setMsg('Already this colour');return;}
+    const before=snapshot();hit.color=st.fillColor;commit(before,'Fill recoloured');return;}
   /* raster window: visible part of the drawing (plus a margin) */
   const W0=svg.clientWidth/st.view.k,H0=svg.clientHeight/st.view.k;let x0=st.view.x,y0=st.view.y,x1=x0+W0,y1=y0+H0;
   const b=unionBox(doc.elements.filter(e=>e.type!=='fill'&&e.type!=='label'));
@@ -1111,7 +1113,7 @@ function bucketFill(p){
   const W=Math.max(8,Math.ceil((x1-x0)*s)),H=Math.max(8,Math.ceil((y1-y0)*s));
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');
   g.lineWidth=3;g.lineCap='round';g.lineJoin='round';g.strokeStyle='#000';
-  for(const pl of fillBarriers(st.fillBound)){if(pl.length<2)continue;g.beginPath();g.moveTo((pl[0].x-x0)*s,(pl[0].y-y0)*s);
+  for(const pl of fillBarriers()){if(pl.length<2)continue;g.beginPath();g.moveTo((pl[0].x-x0)*s,(pl[0].y-y0)*s);
     for(let i=1;i<pl.length;i++)g.lineTo((pl[i].x-x0)*s,(pl[i].y-y0)*s);g.stroke();}
   const img=g.getImageData(0,0,W,H).data;const N=W*H;const R=new Uint8Array(N);/* 0 free, 2 barrier, 1 region */
   for(let i=0;i<N;i++)if(img[i*4+3]>40)R[i]=2;
@@ -1139,7 +1141,6 @@ function bucketFill(p){
   const touches=cnt>0&&(()=>{for(let x=0;x<W;x++)if(R[x]||R[(H-1)*W+x])return true;for(let y=0;y<H;y++)if(R[y*W]||R[y*W+W-1])return true;return false;})();
   const before=snapshot();const el=mkFill(nodes,holes,st.fillColor);
   doc.elements.push(el);
-  st.sel=new Set([el.id]);
   commit(before,touches?'Filled – the region is not closed by the chosen curves, so the fill stops at the edge of the view/drawing':'Region filled');}
 
 /* ---------- pen ---------- */
@@ -1255,7 +1256,7 @@ function styleRows(els){let h='';const lineEls=els.filter(e=>e.type!=='fill'),fi
   const same=(arr,f)=>arr.length&&arr.every(e=>f(e)===f(arr[0]))?f(arr[0]):undefined;
   if(lineEls.length){const cur=same(lineEls,e=>e.color||'');const defs=new Set(lineEls.map(e=>DEFCOL[e.type]));
     h+=row('Colour',swatches(cur===undefined?'#mixed':cur,LINE_COLORS,defs.size===1?[...defs][0]:INK,'data-color'));}
-  if(fills.length&&!(st.tool==='fill')){const cur=same(fills,e=>e.color||'');h+=row(lineEls.length?'Fill colour':'Colour',swatches(cur===undefined?'#mixed':cur,FILL_COLORS,null,'data-fcolor'));}
+  if(fills.length){const cur=same(fills,e=>e.color||'');h+=row(lineEls.length?'Fill colour':'Colour',swatches(cur===undefined?'#mixed':cur,FILL_COLORS,null,'data-fcolor'));}
   const pe=els.filter(isPath);
   if(pe.length){const w=same(pe,curWidth);const t=same(pe,e=>e.type);
     const defLbl=t==='traj'?`auto (${fx(W_SEP/BASE0)} separatrix, ×1 other)`:t?`default (${fx(DEFW[t]/BASE0)})`:'default';
@@ -1271,13 +1272,16 @@ function applyStyle(kind,val){const els=selEls();if(!els.length)return;const bef
     else if(kind==='width'&&isPath(el)){if(val==='mixed')continue;delete el.weight;delete el.width;if(val==='')delete el.lw;else el.lw=parseFloat(val);n++;}}
   if(kind==='fcolor'&&val){st.fillColor=val;savePrefs();}
   if(!n){refresh();return;}st.panelDirty=true;commit(before,kind==='width'?'Line width changed':'Colour changed');}
-function fillToolRows(){const fs=selEls().filter(e=>e.type==='fill');
-  return `<h3>Background fill tool</h3>`+row('Colour',swatches(st.fillColor,FILL_COLORS,null,'data-toolfcolor'))+
-    row('Bounded by',sel_('fillBound',st.fillBound,[['basin','basin boundaries'],['all','all curves']]).replace('data-prop=','data-fillpref='))+
-    `<p class="hint">Tap inside a region to fill it; drag to draw a shape by hand. <b>Basin boundaries</b> = stable separatrices (with their stubs), unstable and semi-stable orbits, and boundaries. A region that is not closed off is cut at the edge of the view/drawing. Tap an existing fill to recolour it.${fs.length?' The colour buttons also recolour the selected fill.':''}</p>`;}
+function fillToolRows(){const on=c=>(c||'').toLowerCase()===(st.fillColor||'').toLowerCase();
+  let sw=`<span class="sws"><button class="sw erase${st.fillColor===ERASE?' on':''}" data-toolfcolor="${ERASE}" title="no colour: tapping a fill removes it"></button>`;
+  for(const [c,nm] of FILL_COLORS)sw+=`<button class="sw${on(c)?' on':''}" data-toolfcolor="${c}" title="${nm}" style="--c:${c}"></button>`;
+  const custom=st.fillColor!==ERASE&&!FILL_COLORS.some(([c])=>on(c));
+  sw+=`<label class="sw pick${custom?' on':''}" title="other colour…" style="--c:${custom?st.fillColor:'#fff'}"><input type="color" data-toolfcolor-pick value="${custom?st.fillColor:'#dbe9ff'}"></label></span>`;
+  return `<h3>Background fill tool</h3>`+row('Active colour',sw)+
+    `<p class="hint">${st.fillColor===ERASE?'<b>No colour</b> is active: tapping a fill removes it.':'Tapping inside a region fills it with the active colour; tapping an existing fill recolours it.'} The active colour applies to the taps that follow; changing it does not alter existing fills.</p>
+    <p class="hint">A region is bounded by all curves (trajectories, separatrices, orbits, boundaries), so a basin may need several taps. Regions that are not closed are cut at the edge of the view/drawing. Dragging draws a fill shape by hand. Fills are decoration only; to edit one in other ways, select it with the Select tool (click inside it).</p>`;}
 function renderPanel(){const box=$('props');const els=selEls();let h='';
-  if(st.tool==='fill'){h+=fillToolRows();if(els.length)h+='<hr class="sepl">';}
-  if(!els.length&&st.tool==='fill'){}
+  if(st.tool==='fill'){h+=fillToolRows();}
   else if(!els.length){h=`<h3>Drawing</h3><p class="hint">Pick a tool on the left. Trajectories are drawn in the direction of the flow; their ends snap to equilibria, separatrix terminals, periodic orbits and boundaries.</p>
     <p class="hint">${doc.elements.length} element${doc.elements.length===1?'':'s'}. Mode: ${doc.structStable?'structurally stable (hyperbolic elements only)':'codimension-one elements allowed'}.</p>
     ${row('Arrow size',`<input type="range" data-docprop="arrowScale" min="0.6" max="2.5" step="0.05" value="${AS()}"><span style="flex:0 0 34px">${AS().toFixed(2)}</span>`)}
@@ -1320,9 +1324,8 @@ function renderPanel(){const box=$('props');const els=selEls();let h='';
 $('props').addEventListener('change',e=>{const t=e.target;
   if(t.hasAttribute('data-color-pick')){applyStyle('color',t.value);return;}
   if(t.hasAttribute('data-fcolor-pick')){applyStyle('fcolor',t.value);return;}
-  if(t.hasAttribute('data-toolfcolor-pick')){st.fillColor=t.value;savePrefs();if(selEls().some(x=>x.type==='fill'))applyStyle('fcolor',t.value);else{st.panelDirty=true;refresh();}return;}
+  if(t.hasAttribute('data-toolfcolor-pick')){st.fillColor=t.value;savePrefs();st.panelDirty=true;refresh();return;}
   if(t.hasAttribute('data-stylewidth')){applyStyle('width',t.value);return;}
-  if(t.dataset.fillpref){st.fillBound=t.value;savePrefs();setMsg(t.value==='basin'?'Fills stop at stable separatrices, unstable orbits and boundaries':'Fills stop at every curve');return;}
   if(t.dataset.pref){st[t.dataset.pref]=t.value;savePrefs();setMsg('Freehand smoothing: '+t.value);return;}
   if(t.dataset.docprop){const before=st.textBefore||snapshot();st.textBefore=null;doc[t.dataset.docprop]=parseFloat(t.value);commit(before,t.dataset.docprop==='lineBase'?'Base line width changed':'Arrow size changed');return;}
   const prop=t.dataset.prop;if(!prop)return;const el=selEls()[0];if(!el)return;
@@ -1340,7 +1343,7 @@ $('props').addEventListener('input',e=>{const t=e.target,prop=t.dataset.prop;
 $('props').addEventListener('click',e=>{const ds=e.target.dataset||{};
   if(ds.color!==undefined){applyStyle('color',ds.color);return;}
   if(ds.fcolor!==undefined){applyStyle('fcolor',ds.fcolor);return;}
-  if(ds.toolfcolor!==undefined){st.fillColor=ds.toolfcolor;savePrefs();if(selEls().some(x=>x.type==='fill'))applyStyle('fcolor',ds.toolfcolor);else{st.panelDirty=true;refresh();}return;}
+  if(ds.toolfcolor!==undefined){st.fillColor=ds.toolfcolor;savePrefs();st.panelDirty=true;refresh();setMsg(st.fillColor===ERASE?'No colour: tap a fill to remove it':'Active fill colour set – tap regions to fill them');return;}
   const a=ds.act;if(!a)return;
   if(a==='back'||a==='front'){const el=selEls()[0];if(!el)return;const before=snapshot();doc.elements=doc.elements.filter(x=>x!==el);
     if(a==='back')doc.elements.unshift(el);else doc.elements.push(el);commit(before,a==='back'?'Sent to back':'Brought to front');return;}
@@ -1683,7 +1686,7 @@ $('cSS').onchange=e=>{const before=snapshot();doc.structStable=e.target.checked;
   st.undo.push(before);st.redo=[];autosave();st.panelDirty=true;setMsg(doc.structStable?'Structural stability enforced':'Codimension-one elements enabled (saddle-node, semi-stable orbits, saddle connections)');refresh();};
 $('bHelp').onclick=()=>openModal('helpModal');
 $('bExample').onclick=()=>{closeModals();loadDoc(exampleDoc());setMsg('Example loaded');};
-function savePrefs(){try{localStorage.setItem('phaseplane-prefs2',JSON.stringify({grid:st.grid,snapGrid:st.snapGrid,magnet:st.magnet,refuse:st.refuse,smoothing:st.smoothing,fillColor:st.fillColor,fillBound:st.fillBound}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem('phaseplane-prefs2',JSON.stringify({grid:st.grid,snapGrid:st.snapGrid,magnet:st.magnet,refuse:st.refuse,smoothing:st.smoothing,fillColor:st.fillColor}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('phaseplane-prefs2')||'null');if(p){Object.assign(st,p);}}catch(e){}
   $('cGrid').checked=st.grid;$('cSnapGrid').checked=st.snapGrid;$('cMagnet').checked=st.magnet;$('cRefuse').checked=st.refuse;}
 function layoutTools(){const t=$('tools');t.classList.remove('two');if(t.scrollHeight>t.clientHeight+1)t.classList.add('two');}

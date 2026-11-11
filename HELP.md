@@ -64,13 +64,12 @@ Every element has a **Colour** row in the right panel; trajectories, periodic or
 
 The **Background fill** tool (`F`) colours regions, typically basins of attraction. Fills are pure decoration: they are drawn underneath everything and are ignored by the magnet and the consistency checks.
 
-* **Tap inside a region** to fill it. With the fill tool active, the right panel sets the colour (seven light presets or any colour) and what bounds the region:
-  * **basin boundaries** (default): stable separatrices together with the stable stubs of their saddles, unstable and semi-stable periodic orbits, and boundaries. Other trajectories, which lie inside a basin, are ignored, so one tap fills the whole basin.
-  * **all curves:** every trajectory, orbit, separatrix and boundary.
-* A region that is not closed off by these curves is cut at the edge of the drawing (plus a small margin) or of the visible area, whichever is smaller. The status bar says so. A fill that leaks where you expected a closed basin often shows a separatrix that is not attached at one end.
-* The outline is traced from the screen and fitted with Bézier curves. Regions with holes (e.g. the basin of a stable orbit around an unstable focus, or the outside of an orbit) get holes. Zoom in before filling for a more accurate outline.
+* **Active colour:** with the fill tool active, the right panel shows the colours (seven light presets, any other colour, and *no colour*, the crossed-out swatch). The chosen colour applies to the taps that follow; changing it never alters existing fills.
+* **Tap inside a region** to fill it with the active colour. **Tap an existing fill** to recolour it. With **no colour** active, a tap on a fill removes it.
+* A region is bounded by all curves: trajectories, separatrices with their stubs, periodic orbits and boundaries. A basin split by several trajectories therefore needs several taps; adjacent fills of the same colour join without visible seams.
+* A region that is not closed off is cut at the edge of the drawing (plus a small margin) or of the visible area, whichever is smaller. The status bar says so.
+* The outline is traced from the screen and fitted with Bézier curves. Regions with holes (e.g. the outside of an orbit) get holes. Zoom in before filling for a more accurate outline.
 * **Drag** instead of tapping to draw a fill shape by hand.
-* **Tap an existing fill** with the fill tool to recolour it with the current colour.
 * In Select mode, **click inside a fill** (on empty space) to select it. A selected fill can be dragged, scaled, recoloured, simplified, edited node by node, or moved with *Send to back* / *Bring to front*.
 * The outline does not follow later edits of the curves. After changing the picture, delete the fill and tap again.
 
