@@ -1,6 +1,6 @@
 # Phase Portrait Sketcher — specification, plan and implementation notes
 
-This file records the requirements as given, the feasibility assessment, the decisions taken, and enough of the design to regenerate the tool from scratch, for example by another AI instance or developer. The current implementation is `index.html` (about 1,250 lines, one self-contained file). User-facing help is in `HELP.md`; `README.md` is a short overview for the GitHub landing page.
+This file records the requirements as given, the feasibility assessment, the decisions taken, and enough of the design to regenerate the tool from scratch, for example by another AI instance or developer. The current implementation is `index.html` (about 1,700 lines, one self-contained file). User-facing help is in `HELP.md`; `README.md` is a short overview for the GitHub landing page.
 
 ---
 
@@ -124,6 +124,47 @@ Cause: a numerical weakness of PGF's `decorations.markings`. For some curves, ce
 
 Fix: the TikZ export no longer uses decorations. Arrowheads are written as `\fill` polygons computed by `arrowPoly`, the same shape and position as on screen, so the export needs no TikZ libraries.
 
+### Round 17
+> The attached folder contains code and documentation (in PLAN.md) for a browser based phase-plane sketching tool, created by claude. Extensive usage has shown the need for a few additional features:
+>
+> * periodic orbits (when stable) are hard to distinguish even in moderately complex phase portraits because they have the same thickness as saddle separatrices. Is there an easy interface to assign individual thickness and/or colors
+> * when using the pen on an ipad with the bezier tool it is difficult to end the curve
+> * some background filling tool to highlight basins of attractions (possibly pure decorations as consistency checks may be hard).
+>
+> Could these changes be made without breaking importability of existing figures?
+
+Response (details in §3.12):
+* **Colours and widths:** optional per-element fields `color` and `width`, edited in a *Colour* / *Line width* section of the side panel. It works on multiple selections, so for example all stable orbits can be made heavy at once.
+* **Pen on iPad:** a floating bar (✓ Finish, ↶ Node, ✕), tap the last node again to finish, automatic finish when a node lands on a snap target, larger double-tap tolerance and handle threshold for pen and touch input, and switching tool now finishes the curve instead of discarding it.
+* **Background fill** (tool `F`): a new decorative element type `fill`. A tap does a raster flood fill bounded by "basin boundaries" (stable separatrices, unstable and semi-stable orbits, boundaries) or by all curves, and the outline is traced and fitted into Bézier rings with holes. A drag draws a freehand shape instead. Fills are never checked.
+* **Compatibility:** all new fields are optional and the format version stays 1. Existing files export byte-identical SVG and TikZ (checked for `fish.phase.json`, all items of `phaseplane-examples.json` and the built-in example). Older copies of the tool ignore the new fields; they draw nothing for a `fill` element.
+
+### Round 18
+> Line coloring/thickness works as expected.
+> Could the thickness scale be based on a "base thickness", where the other thicknesses are the multiples currently used?
+> A line thickness option should also be available for the transversal cross sections.
+> The default coloring for for transversals should change from green to another color as dark green and dark/matte red are natural options for stable/unstable periodic orbits (leave default black for for everything except transversals). The dark orange from the palette is suitable.
+> The coloring of saddles should only affect the circle in the center, not the arrows.
+
+Changes:
+* **Base thickness:** optional document field `lineBase` (default 1.3), set with a slider. Every stroke is the nominal width (the Round 17 value at base 1.3) × `lineBase/1.3`. This covers glyph outlines, spirals, stubs and marks. Per-element widths are stored as multiples `lw` (presets ×0.6, ×1, ×1.5, ×2, ×3, ×4.5, ×6). Defaults are trajectory ×1, separatrix ×1.54, orbit ×1.62, transversal ×1.15. The Round 17 field `width` (absolute px at base 1.3) is still read.
+* **Transversals:** they already had *Line width*, but the crossing marks stayed thin. Mark length, stroke and arrowheads now scale with `arrowK`.
+* **Default transversal colour** is the palette's dark orange `#c26b00` (also the tool icon and TikZ `ppbnd`). The palette red became a matte dark red `#a8322d`; dark green `#1a7f5a` stays.
+* **Saddle colour:** the stubs and stub arrows of saddles and saddle-nodes are always ink. Only the centre glyph takes `color`.
+* **Compatibility:** apart from the transversal colour, old files (and Round 17 files with absolute `width`) export identically.
+
+### Round 19
+> Is the matte dark red distinguishable from from the dark green for a color blind person? Choose a compromise between "good-looking" (that is, not too bright on the screen) and ok for color blind.
+
+Answer: only barely.
+* Method: simulated protanopia, deuteranopia and tritanopia (Machado et al. 2009 matrices, severity 1, in linear RGB), then took the CIEDE2000 difference.
+* `#a8322d` vs `#1a7f5a` gave ΔE ≈ 15 (protan) and 13 (deutan): two dull browns of similar lightness, which is weak for thin lines.
+* New palette `LINE_COLORS`: dark red `#9b1c1c`, blue `#1f6feb`, teal green `#0b8f87`, orange `#c26b00`, plum `#9c3587`, dark grey `#4b5058`.
+  * The red is darker (L* 34) and the green lighter and bluish (L* 53), giving ΔE ≈ 31 / 32 for protan / deutan and 61 normally. The teal still has 4:1 contrast on white.
+  * Purple and grey were also changed: the old purple `#8250df` was indistinguishable from blue for deutans (ΔE 2.4), and the old grey from the new teal (4.4).
+  * Every pair in the palette now stays ≥ 10.9 under all three deficiencies. The weakest pair is blue vs teal under tritanopia.
+* Colours already stored in files are unchanged; they simply show as a custom colour in the panel.
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)
@@ -146,6 +187,8 @@ Fix: the TikZ export no longer uses decorations. Arrowheads are written as `\fil
 | Export SVG / PNG / TikZ, PDF via print | Easy | Done |
 | Global realisability (does a C¹ vector field exist for the picture?) | Research-level | Not wanted |
 | Generating and integrating a vector field from the sketch | Hard, fragile | Not wanted |
+| Per-element colour and line width | Easy | Done (Round 17) |
+| Background fills for basins: raster flood fill bounded by basin boundaries, traced into Bézier rings | Moderate | Done; decorative only, not kept in sync with later edits |
 | Non-planar phase spaces (sphere, torus, Poincaré disc) | Out of scope | — |
 | Hopf / weak focus | — | Omitted: topologically identical to a focus |
 
@@ -192,6 +235,11 @@ Element types:
 | `cycle` | `id, nodes[], closed:true, stability ∈ {stable, unstable, semi-inner, semi-outer}, dir (±1, flow vs parametrisation), arrows (default 2)` |
 | `boundary` | `id, nodes[], closed (bool), dir (±1), spacing (crossing-arrow spacing, default 36)` |
 | `label` | `id, x, y, text, size (default 16)` |
+| `fill` | `id, nodes[] (outer ring), closed:true, holes (optional array of node arrays), color` |
+
+Optional on every element (Round 17): `color` (hex string; missing = default ink `#111`, boundaries `#c26b00` since Round 18; for saddles and saddle-nodes only the centre glyph). Optional on `traj`, `cycle` and `boundary`: `lw`, the width as a multiple of the base (Round 18). The older `width` (absolute px at base 1.3, Round 17) is still read when `lw` is missing, then the legacy trajectory `weight`. Setting a width from the panel writes `lw` and deletes `width` and `weight`.
+
+Optional document field (Round 18): `lineBase`, the base line width in px (default 1.3). All strokes are multiplied by `LB() = lineBase/1.3`.
 
 `semi-inner` = attracting from inside and repelling outside; `semi-outer` is the reverse.
 
@@ -341,9 +389,9 @@ Bindings (trajectory ends):
 | Item | Value |
 |---|---|
 | Ink | `#111` |
-| Boundary colour | `#1a7f5a` |
+| Boundary colour | `#c26b00` (dark orange; was `#1a7f5a` before Round 18) |
 | Selection colour | `#2f81f7` |
-| Trajectory width | 1.3 |
+| Trajectory width | 1.3 (all widths × `lineBase`/1.3, Round 18) |
 | Separatrix width | 2.0 (trajectory touching a separatrix port, or `weight = thick`; stubs always) |
 | Cycle width | 2.1 (unstable dashed 6/4) |
 | Semi-stable cycle | Extra dashed (3/3) offset curve, 4 units on the repelling side |
@@ -383,6 +431,15 @@ Bindings (trajectory ends):
   * Storage scope: per origin (see Round 8).
 * **Drag-and-drop:** a file dropped on `#stage` is loaded with `loadDoc`.
 
+### 3.11a Pen finishing (Round 17)
+
+* `pointerdown` records `st.coarse = pointerType ∈ {pen, touch}`. For coarse input, a double-tap may be 480 ms and 16 px apart (mouse: 380 ms, 6 px), the "click without movement" test allows 12 px, and a drag must exceed 9 px (mouse: 3 px) to pull out pen handles; smaller wobbles leave a corner node.
+* `downPen`:
+  * a tap within 16 px (mouse 5 px) of the last node finishes the curve, provided it has at least 2 nodes;
+  * if `penEndSnap(q)` finds a valid end target, the node is placed on it and `st.pen.finishOnUp` is set; `pointerup` then calls `finishPen(true)`. `penEndSnap` tests the curve so far plus `q` as a trajectory end with `findSnap(…,'end')`, skipping points within `SNAP_PX` of the first node. While the pen is active, `pointermove` shows this end target as a magnet ring.
+* `#penBar` is an absolutely positioned div at the top centre of `#stage`, shown while the pen has nodes (`updatePenBar`). Its buttons are ✓ Finish (disabled below 2 nodes), ↶ Node (pop the last node) and ✕ (discard). `Backspace`/`Del` also pop a node while the pen is active.
+* `setTool` calls `finishPen(true)`, so tapping another tool or the pen tool again keeps the curve. `Esc` still discards it.
+
 ### 3.11 Clipboard
 
 * **Native sketch:**
@@ -412,6 +469,46 @@ Bindings (trajectory ends):
   * *Copy sketch* takes the elements whose bounding box lies fully inside the rectangle.
 * **UI:** top-bar group Copy / Paste / Copy image; key `I` = copy image. `Ctrl+Shift+C` was avoided because browsers reserve it for developer tools.
 
+### 3.12 Colours, line widths and background fills (Round 17)
+
+**Style fields.**
+* Helpers: `colOf(el, def)` validates `el.color` as hex, else returns `def`; `widthOf(el, def)`; `arrowK(w, base) = max(1, √(w/base))` scales arrowheads (and the dashes of unstable orbits, linearly) for lines thicker than the default.
+* Base widths: `W_TRAJ` 1.3, `W_SEP` 2.0 (bases trajectory arrows), `W_CYC` 2.1, `W_BND` 1.5.
+* The semi-stable shadow offset grows by `(w − 2.1)/2`. Equilibrium colour applies to the glyph, stubs, stub arrows and spiral (a source stays white inside); label colour to the text fill.
+
+**Panel.**
+* `styleRows(els)` builds the Colour row: `.sw` swatch buttons with `data-color` (empty = default) plus a `<label class="sw pick">` wrapping `<input type=color data-color-pick>`. Fills use `data-fcolor` and `FILL_COLORS`.
+* It also builds the *Line width* `<select data-stylewidth>`: '' = auto/default, `WIDTHS` presets, the current non-preset value, and 'mixed'.
+* Mixed selections show "(mixed)" and no active swatch.
+* `applyStyle(kind, val)` changes all selected elements of the matching kind and commits once.
+
+**Fill element.**
+* `hasNodes(el)` = `isPath(el) || type === 'fill'`. It is used for node editing, bounding boxes, `affine` (which also maps `holes`), simplify and node insertion.
+* `isPath` stays restricted to traj, cycle and boundary, so validation, the magnet and bindings never see fills.
+* `ORDER.fill = −1` draws fills under everything; among fills, document order decides, adjusted by *Send to back* / *Bring to front*.
+* Rendering: `fillD` = outer ring + hole rings, `fill-rule="evenodd"`, no stroke.
+* In the editor an unselected fill has `pointer-events="none"`, so marquee drags work on top of fills. A selected fill is hittable, so it can be dragged.
+* A click without a drag on empty space selects the topmost fill containing the point (`fillAt`, at marquee `pointerup`).
+
+**Fill tool** (`st.fillColor`, `st.fillBound` ∈ {basin, all}, both stored in preferences).
+* A drag of more than 40 px makes a freehand fill (`closedNodes`). A tap calls `bucketFill(p)`:
+  1. If `fillAt(p)` hits an existing fill, recolour it.
+  2. Raster window = visible area ∩ (union bounding box of non-fill, non-label elements + 24). Scale `s = min(1600/max side, max(2, 1.5·zoom))` canvas px per world unit.
+  3. Draw the barrier polylines (`fillBarriers(mode)`) with canvas line width 3 px. Pixels with alpha > 40 are barriers.
+     * *basin*: trajectories whose end is a separatrix port with role *end* (`isStableSep`), equilibrium stubs with role *end*, cycles that are not stable, and all boundaries.
+     * *all*: every trajectory, cycle, boundary and stub.
+     * Trajectory ends bound to a cycle are extended to the cycle point `C(t)`, closing the `CYC_OFF` gap.
+  4. 4-connected stack flood fill from the seed (moved to a free pixel within 4 px if it lands on a line).
+  5. Grow the region 3 times by one pixel, into barrier pixels only. This brings the colour under the curves and closes the slits left by curves ending inside a region, without leaking across a line.
+  6. Trace the region: directed pixel-edge contour, clockwise on screen, chained per vertex with a right-turn preference. The largest positive-area loop is the outer ring; negative loops inside it with area > max(60, (10s)²) px² are holes.
+  7. Each loop: `smoothPoly` (3 passes) → `rdpClosed` (ε = max(0.8, s/zoom) px, i.e. about 1 screen px) → world coordinates → closed `crNodes`. Nodes turning by more than 55° become corners (zero handles).
+  8. If the region touches the raster border, the status bar reports that the region is not closed.
+
+**Export.**
+* SVG and PNG need no change.
+* PDF: the path branch emits `f*` / `B*` when `fill-rule="evenodd"`.
+* TikZ: colours are collected into `\definecolor{ppcN}{HTML}{RRGGBB}` lines inserted after `ppbnd`. Non-default widths become `line width=…`. Arrowhead polygons get the colour and the `arrowK` size. A fill becomes `\fill[ppcN,even odd rule] ring .. cycle ring .. cycle;`.
+
 ---
 
 ## 4. Testing approach used
@@ -434,6 +531,12 @@ The tool was tested with headless Chromium through Playwright (Python), using re
 * the export menu not being covered (`elementFromPoint`);
 * toolbar wrapping and two-column tools at 1000×560 and 820×480;
 * SVG/PNG export; TikZ compiled with pdflatex (standalone class).
+* Round 17:
+  * backward compatibility: old and new `index.html` load `fish.phase.json`, every item of `phaseplane-examples.json` and the built-in example, and produce byte-identical `exportSVG()`, `tikz()` and validation results;
+  * colour and width via panel clicks, including multi-selection;
+  * basin fills on the example (two basins split by the stable manifold; the outside of the unstable orbit gives a ring with a hole); recolour by tap; selection by click;
+  * pen with synthetic `pointerType:'pen'` events: tap-last-node with 9 px jitter, finish on a sink (end bound to the sink), Finish and ↶ Node buttons, tool switch keeps the curve, mouse double-click;
+  * TikZ with colours and fills compiled by pdflatex; direct PDF passes `qpdf --check`; rasterised outputs compared visually with the screen.
 
 ---
 
@@ -444,9 +547,9 @@ The tool was tested with headless Chromium through Playwright (Python), using re
 * Double-clicking a curve exactly on one of its handle dots does not insert a node.
 * An end attached to a sink, source or node-sector centre has no node handle; use *Detach end*.
 * Spirals are decorative and are excluded from crossing checks.
+* Bucket fills are traced at screen resolution from the visible part of the drawing: zoom in for accuracy, and pan so that the whole region is visible.
 * Possible extensions:
   * axes / nullcline elements;
   * a Poincaré-disc frame;
-  * colour or line-style options;
-  * copy/paste between drawings;
+  * fills that follow later edits of the curves (currently a fill is a static shape; re-tap after editing);
   * an optional per-trajectory "asymptotic spiral" ending at foci.

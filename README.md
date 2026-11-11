@@ -12,6 +12,7 @@ A browser tool for sketching qualitative phase portraits of planar flows, as use
 * Sinks, sources, foci and saddles with four separatrix terminals; stable, unstable and semi-stable periodic orbits; inflow and outflow boundaries for trapping regions.
 * Consistency checks: crossings, flow direction, and the index sum inside orbits. Inconsistent edits can optionally be refused.
 * A structural-stability switch. When it is off, codimension-one elements are allowed: saddle-nodes, semi-stable orbits and saddle connections.
+* Per-element colours and line widths, and background fills that colour basins of attraction with one tap.
 * Export to PDF cropped for LaTeX, TikZ, SVG and PNG, plus printing.
 * Copy and paste of sketches between drawings, and copying images to the clipboard for note-taking apps.
 * A single self-contained `index.html` with no dependencies. It also works offline: download it and open it from disk.

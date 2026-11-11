@@ -13,13 +13,14 @@ A browser tool for sketching qualitative phase portraits of planar flows, the ki
 | Select / edit | `V` | Click or drag a rectangle to select; `Shift` adds to the selection. Drag to move. Corner handles scale uniformly (`Shift`: free, `Alt`: about the centre), edge handles stretch one direction, the round handle on top rotates (`Shift`: 15° steps). |
 | Pan | `H` | Drag to pan. `Space`+drag or the middle mouse button also pans. |
 | Trajectory (freehand) | `T` | Draw in the direction of the flow. The stroke is smoothed and converted to cubic Béziers. Ends snap to targets (see *Magnet*). If an end only fits the other way round, the trajectory is reversed automatically. |
-| Bézier pen | `P` | Click for corner points; click-drag to pull out smooth handles. `Enter` or double-click finishes, `Esc` cancels. |
+| Bézier pen | `P` | Click for corner points; click-drag to pull out smooth handles. Finish the curve in any of these ways: the **✓ Finish** button at the top of the drawing area, tapping the last node again, placing the last node on a snap target (sink, source, saddle terminal, orbit, boundary, free start of another trajectory), `Enter`, a double-click, or switching to another tool. **↶ Node** or `Backspace` removes the last node; **✕** or `Esc` discards the curve. With an Apple Pencil or a finger, taps and double-taps get a larger tolerance and small wobbles do not create handles. |
 | Sink | `1` | Filled disc. Can be shown as a focus (cw/ccw spiral). |
 | Source | `2` | Open disc. Can be shown as a focus. |
 | Saddle | `3` | Has 4 terminals: two unstable separatrices (pointing out) and two stable ones (pointing in). Drag the diamond handles to rotate it or to change the angle between its eigendirections. |
 | Saddle-node | `4` | Codimension 1, only when *Structurally stable* is off. Transversally stable or unstable. Half-filled disc on the node side, with three separatrix terminals plus the node sector. |
 | Periodic orbit | `C` | Click for an ellipse, or draw a closed loop. Stable = solid, unstable = dashed. Semi-stable (codim 1) = solid with a dashed shadow on the repelling side. Arrows show the orientation. |
-| Boundary | `B` | A transversal the flow crosses in one direction only, shown by small crossing arrows. A closed loop is created as an *inflow* boundary (trapping region); flip it in the panel. |
+| Boundary | `B` | A transversal the flow crosses in one direction only, shown by small crossing arrows (dark orange by default). A closed loop is created as an *inflow* boundary (trapping region); flip it in the panel. |
+| Background fill | `F` | Colours a region, e.g. a basin of attraction (see *Background fills* below). |
 | Region | `G` | Drag a rectangle. A small bar offers **Copy image** (exactly that rectangle, as a PNG for other apps; curves are clipped at its edge) and **Copy sketch** (the elements lying completely inside, for pasting into this tool). `Esc` or ✕ cancels. |
 | Label | `L` | Click to place text. Inside `$…$`: `_` gives a subscript, `^` a superscript, and `\alpha`, `\Gamma`, … give Greek letters. TikZ receives the text verbatim. |
 
@@ -44,7 +45,34 @@ A browser tool for sketching qualitative phase portraits of planar flows, the ki
   * `Ctrl+Z` / `Ctrl+Shift+Z` undo and redo.
   * `Esc` goes back to Select.
 * **View:** the mouse wheel zooms around the cursor; `+`/`−` zoom and `0` fits the drawing.
-* **Panels:** the right panel edits the selected element (type, rotation, stability, arrows, line weight, …). With nothing selected it shows drawing-wide settings: arrow size and freehand smoothing.
+* **Colour and line width:** see *Colours and line widths* below.
+* **Panels:** the right panel edits the selected element (type, rotation, stability, arrows, colour, line width, …). With nothing selected it shows drawing-wide settings: arrow size and freehand smoothing.
+
+## Colours and line widths
+
+Every element has a **Colour** row in the right panel; trajectories, periodic orbits and boundaries (transversals) also have **Line width**.
+
+* **Base line width** (right panel with nothing selected, default 1.3) sets the thickness of everything at once. All widths are multiples of it: trajectories ×1, separatrices ×1.54, periodic orbits ×1.62, boundaries ×1.15; glyph outlines, spirals and crossing marks scale along.
+* **Line width** of an element is a multiple of the base: ×0.6, ×1, ×1.5, ×2, ×3, ×4.5 or ×6. *Auto* / *default* restores the built-in multiple.
+* The hollow first swatch means *default* (black; dark orange for boundaries); the next six are preset colours (dark red, blue, teal green, orange, plum, dark grey); the rainbow swatch opens a colour picker for any colour. Teal green and dark red suit stable and unstable periodic orbits. The palette is chosen to stay distinguishable for colour-blind readers: the red is dark and the green lighter and bluish, so the two differ in lightness as well as hue.
+* Colouring a saddle or saddle-node colours only the glyph in the centre; its separatrix stubs stay black. Sinks and sources are coloured with their focus spiral.
+* With several elements selected, both rows change all of them at once, for example to make all stable periodic orbits heavy and red so that they stand out from separatrices.
+* Arrowheads grow gently with lines thicker than the default, as do the crossing marks of boundaries; the dashes of unstable orbits scale too.
+* Colours and widths are kept in all exports (SVG, PNG, PDF, TikZ). In TikZ, each colour becomes a `\definecolor{ppcN}{HTML}{…}` line at the top of the picture.
+
+## Background fills
+
+The **Background fill** tool (`F`) colours regions, typically basins of attraction. Fills are pure decoration: they are drawn underneath everything and are ignored by the magnet and the consistency checks.
+
+* **Tap inside a region** to fill it. With the fill tool active, the right panel sets the colour (seven light presets or any colour) and what bounds the region:
+  * **basin boundaries** (default): stable separatrices together with the stable stubs of their saddles, unstable and semi-stable periodic orbits, and boundaries. Other trajectories, which lie inside a basin, are ignored, so one tap fills the whole basin.
+  * **all curves:** every trajectory, orbit, separatrix and boundary.
+* A region that is not closed off by these curves is cut at the edge of the drawing (plus a small margin) or of the visible area, whichever is smaller. The status bar says so. A fill that leaks where you expected a closed basin often shows a separatrix that is not attached at one end.
+* The outline is traced from the screen and fitted with Bézier curves. Regions with holes (e.g. the basin of a stable orbit around an unstable focus, or the outside of an orbit) get holes. Zoom in before filling for a more accurate outline.
+* **Drag** instead of tapping to draw a fill shape by hand.
+* **Tap an existing fill** with the fill tool to recolour it with the current colour.
+* In Select mode, **click inside a fill** (on empty space) to select it. A selected fill can be dragged, scaled, recoloured, simplified, edited node by node, or moved with *Send to back* / *Bring to front*.
+* The outline does not follow later edits of the curves. After changing the picture, delete the fill and tap again.
 
 ## Copy and paste
 
@@ -87,6 +115,8 @@ The *Consistency* panel lists:
 * **Warnings (amber):**
   * the index sum inside a periodic orbit or closed boundary is not 1 (nodes and foci count +1, saddles −1, saddle-nodes 0);
   * non-generic elements present while *Structurally stable* is on.
+
+Background fills are never checked.
 
 **Refuse crossings** (off by default): when on, an edit that introduces a new problem is undone, the offending spot flashes red and the status bar gives the reason. When off, problems are only flagged.
 
