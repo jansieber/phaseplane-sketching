@@ -179,6 +179,24 @@ Changes:
 * The fill tool no longer selects the fills it creates, and entering the tool clears the selection. Fills are edited further with the Select tool.
 * The "bounded by" option and the *basin boundaries* mode are removed: `fillBarriers()` always uses every trajectory, cycle, boundary and stub, with trajectory ends on a cycle still extended onto it. The `fillBound` preference is gone.
 
+### Round 21
+> A further modification of the saddle-node: currently it has the options: transversally stable/unstable. Could another option be "tbd" (possibly different name), which  leaves out the transversal arrows initially? This would permit the drawing of 1d phase portraits (just along horizontal lines). Once, one connects another transversal trajectory, the transversal properties are determined for a 2d phase portrait.
+> Commit to git if this is practical and implemented.
+
+Implemented as `trans: 'open'` (panel: "open (1-d, decided later)").
+* `eqPorts`: an open saddle-node has the centre stubs `cm` (angle, role *start*) and `cn` (angle + 180°, role *end*). It also has `h1`/`h2` marked `hidden:true` and no node sector `c`. `portRole` gives the hidden ports role `'any'` (single, separatrix), and `compat` accepts `'any'` for either role.
+* Hidden ports are skipped for drawing, hit areas, crossing checks, fill barriers and TikZ, but `findSnap` and `resolveTraj` still see them.
+* The glyph is filled on the `cn` side (the same as *stable*).
+* `settleSN()`, run at the start of `resolveAll()` (so before every validation and commit), converts an open saddle-node as soon as a trajectory is bound to a hidden port: bound by its end → `convertSN(e,'stable')`; by its start → `'unstable'`.
+* `convertSN(e,to)` remaps attached bindings:
+  * open→stable: `cn→c`;
+  * open→unstable: angle += 180°, `cm→c`, `cn→cm`, `h1↔h2`, so that the picture (glyph, centre-line flow, transversal positions) is unchanged;
+  * stable→open: `c→cn`;
+  * unstable→open: angle −= 180°, `c→cm`, `cm→cn`.
+  * Going to *open* is refused while `h1`/`h2` are bound or when more than one trajectory ends in the node sector. stable↔unstable keeps the old behaviour.
+* Panel changes of `trans` go through `convertSN`. The last choice is stored as `st.snTrans` (preferences) and used by `mkEq` for new saddle-nodes.
+* Compatibility: existing stable and unstable saddle-nodes and all other files export identically (checked against the Round 20 version).
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)
@@ -244,7 +262,7 @@ Element types:
 
 | type | fields |
 |---|---|
-| `eq` | `id, kind ∈ {sink, source, saddle, sn}, x, y, angle (deg), spread (deg, saddle: angle from unstable to stable dir, default 90), len (separatrix stub length, default 30), spiral ∈ {none, cw, ccw} (sink/source), trans ∈ {stable, unstable} (sn)` |
+| `eq` | `id, kind ∈ {sink, source, saddle, sn}, x, y, angle (deg), spread (deg, saddle: angle from unstable to stable dir, default 90), len (separatrix stub length, default 30), spiral ∈ {none, cw, ccw} (sink/source), trans ∈ {stable, unstable, open} (sn; open since Round 21)` |
 | `traj` | `id, nodes[], start, end (binding or null), arrows (0–8, default 1), arrowPos (0–1, used when arrows = 1), weight ∈ {auto, normal, thick}` |
 | `cycle` | `id, nodes[], closed:true, stability ∈ {stable, unstable, semi-inner, semi-outer}, dir (±1, flow vs parametrisation), arrows (default 2)` |
 | `boundary` | `id, nodes[], closed (bool), dir (±1), spacing (crossing-arrow spacing, default 36)` |

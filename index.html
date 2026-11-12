@@ -224,7 +224,7 @@ hr.sepl{border:0;border-top:1px solid var(--line);margin:10px -12px}
   <p>All line widths are multiples of the <b>base line width</b> (right panel, nothing selected; default 1.3): trajectories ×1, separatrices ×1.54, periodic orbits ×1.62, transversals ×1.15. The right panel has <b>Colour</b> and <b>Line width</b> (a multiple of the base) for the selected element(s); with several elements selected they are changed together (e.g. all stable orbits ×3 and dark green). The hollow first swatch restores the default (black; dark orange for transversals); the rainbow swatch picks any colour. Colouring a saddle or saddle-node colours only its centre glyph, not the separatrix stubs. Arrowheads and the crossing marks of transversals grow with thicker lines. Colours and widths go into all exports, including TikZ. Arrow size is a drawing-wide setting in the right panel (nothing selected).</p>
   <h4>Consistency checks</h4>
   <p>With <b>Refuse crossings</b> on, an edit is undone if it makes curves cross (trajectories, separatrices, periodic orbits), runs a curve through an equilibrium, crosses a boundary against its direction, or attaches a trajectory the wrong way (e.g. flowing out of a sink). With it off, these are only flagged in red. Index warnings (equilibria inside a periodic orbit or closed transversal must have index sum 1) are always only warnings.</p>
-  <p><b>Structurally stable</b> on: only hyperbolic elements, and saddle connections are refused. Off: saddle-nodes (transversally stable/unstable), semi-stable periodic orbits and saddle connections / homoclinic loops become available.</p>
+  <p><b>Structurally stable</b> on: only hyperbolic elements, and saddle connections are refused. Off: saddle-nodes (transversally stable/unstable, or <i>open</i>: drawn 1-d along the centre line until a trajectory attached to a hidden transversal terminal decides the stability; new saddle-nodes use the last choice), semi-stable periodic orbits and saddle connections / homoclinic loops become available.</p>
   <div class="btns"><button id="bExample">Load example</button><button data-close>Close</button></div>
 </div></div>
 
@@ -385,7 +385,7 @@ const isPath=el=>el&&(el.type==='traj'||el.type==='cycle'||el.type==='boundary')
 /* fills (decorative background regions) have nodes like a closed path but take no part in snapping or consistency checks */
 const hasNodes=el=>isPath(el)||(el&&el.type==='fill');
 
-function mkEq(kind,x,y){return {id:doc.nextId++,type:'eq',kind,x,y,angle:0,spread:90,len:30,spiral:'none',trans:'stable'};}
+function mkEq(kind,x,y){return {id:doc.nextId++,type:'eq',kind,x,y,angle:0,spread:90,len:30,spiral:'none',trans:kind==='sn'&&st.snTrans?st.snTrans:'stable'};}
 function mkTraj(nodes){return {id:doc.nextId++,type:'traj',nodes,start:null,end:null,arrows:1,arrowPos:0.5};}
 function mkCycle(nodes,stability){return {id:doc.nextId++,type:'cycle',nodes,closed:true,stability,dir:1,arrows:2};}
 function mkBoundary(nodes,closed){return {id:doc.nextId++,type:'boundary',nodes,closed,dir:1,spacing:36};}
@@ -394,7 +394,7 @@ function mkFill(nodes,holes,color){const el={id:doc.nextId++,type:'fill',nodes,c
 
 const EQNAME={sink:'sink',source:'source',saddle:'saddle',sn:'saddle-node'};
 function elName(el){if(!el)return '?';
-  if(el.type==='eq')return (el.kind==='sn'?(el.trans==='stable'?'transversally stable ':'transversally unstable '):'')+EQNAME[el.kind]+' #'+el.id;
+  if(el.type==='eq')return (el.kind==='sn'?(el.trans==='open'?'1-d ':el.trans==='stable'?'transversally stable ':'transversally unstable '):'')+EQNAME[el.kind]+' #'+el.id;
   if(el.type==='traj')return 'trajectory #'+el.id;
   if(el.type==='cycle')return ({stable:'stable',unstable:'unstable','semi-inner':'semi-stable','semi-outer':'semi-stable'})[el.stability]+' periodic orbit #'+el.id;
   if(el.type==='boundary')return 'boundary #'+el.id;
@@ -402,9 +402,12 @@ function elName(el){if(!el)return '?';
   return 'label #'+el.id;}
 
 function eqPorts(e){const Pp=[],c={x:e.x,y:e.y};
-  const stub=(port,deg)=>{const d=eqDir(deg);Pp.push({port,pos:vadd(c,vmul(d,e.len)),dir:d});};
+  const stub=(port,deg,hidden)=>{const d=eqDir(deg);const q={port,pos:vadd(c,vmul(d,e.len)),dir:d};if(hidden)q.hidden=true;Pp.push(q);};
   if(e.kind==='sink'||e.kind==='source')Pp.push({port:'c',pos:c,dir:null});
   else if(e.kind==='saddle'){stub('u1',e.angle);stub('u2',e.angle+180);stub('s1',e.angle+e.spread);stub('s2',e.angle+e.spread+180);}
+  else if(e.kind==='sn'&&e.trans==='open'){/* 1-d saddle-node: centre line only (flow arrives along cn, leaves along cm);
+      the transversal terminals are not drawn but still snap – the first trajectory attached there decides the transversal stability */
+    stub('cm',e.angle);stub('cn',e.angle+180);stub('h1',e.angle+90,true);stub('h2',e.angle-90,true);}
   else if(e.kind==='sn'){stub('cm',e.angle);stub('h1',e.angle+90);stub('h2',e.angle-90);Pp.push({port:'c',pos:c,dir:null});}
   return Pp;}
 /* role: 'start' = trajectories leave the equilibrium here, 'end' = they arrive */
@@ -413,11 +416,32 @@ function portRole(e,port){
   if(e.kind==='source')return port==='c'?{role:'start',single:false,sep:false}:null;
   if(e.kind==='saddle'){if(port==='u1'||port==='u2')return {role:'start',single:true,sep:true};
     if(port==='s1'||port==='s2')return {role:'end',single:true,sep:true};return null;}
+  if(e.kind==='sn'&&e.trans==='open'){if(port==='cm')return {role:'start',single:true,sep:true};
+    if(port==='cn')return {role:'end',single:true,sep:true};
+    if(port==='h1'||port==='h2')return {role:'any',single:true,sep:true};return null;}
   if(e.kind==='sn'){const s=e.trans==='stable';
     if(port==='cm')return {role:s?'start':'end',single:true,sep:true};
     if(port==='h1'||port==='h2')return {role:s?'end':'start',single:true,sep:true};
     if(port==='c')return {role:s?'end':'start',single:false,sep:false};}
   return null;}
+/* change the transversal type of a saddle-node, moving attached trajectories to the matching terminals.
+   open→stable keeps the picture (cn becomes the node sector); open→unstable turns the element by 180° so that the flow along the
+   centre line and the half-filled glyph stay where they are. Returns an error message or null. */
+function convertSN(e,to){const from=e.trans||'stable';if(from===to)return null;
+  if(from!=='open'&&to!=='open'){e.trans=to;return null;}
+  const binds=[];for(const tr of doc.elements)if(tr.type==='traj')for(const w of ['start','end']){const b=tr[w];if(b&&b.el===e.id&&b.port)binds.push(b);}
+  let map;
+  if(from==='open'){map=to==='stable'?{cn:'c'}:{cm:'c',cn:'cm',h1:'h2',h2:'h1'};if(to==='unstable')e.angle=((e.angle+180)%360+360)%360;}
+  else{if(binds.some(b=>b.port==='h1'||b.port==='h2'))return 'detach the transversal trajectories (the perpendicular terminals) first';
+    if(binds.filter(b=>b.port==='c').length>1)return 'more than one trajectory ends in the node sector; a 1-d saddle-node has only one terminal on that side';
+    map=from==='stable'?{c:'cn'}:{c:'cm',cm:'cn'};if(from==='unstable')e.angle=((e.angle-180)%360+360)%360;}
+  for(const b of binds)if(map[b.port])b.port=map[b.port];
+  e.trans=to;return null;}
+/* a trajectory attached to a hidden transversal terminal of a 1-d saddle-node fixes its transversal stability */
+function settleSN(){for(const e of doc.elements){if(e.type!=='eq'||e.kind!=='sn'||e.trans!=='open')continue;
+    for(const tr of doc.elements){if(tr.type!=='traj')continue;
+      if(tr.end&&tr.end.el===e.id&&(tr.end.port==='h1'||tr.end.port==='h2')){convertSN(e,'stable');break;}
+      if(tr.start&&tr.start.el===e.id&&(tr.start.port==='h1'||tr.start.port==='h2')){convertSN(e,'unstable');break;}}}}
 function eqIndex(e){return e.kind==='saddle'?-1:e.kind==='sn'?0:1;}
 function cycleRole(stab,side){/* side +1 = trajectory lies inside the orbit */
   if(stab==='stable')return 'end';if(stab==='unstable')return 'start';
@@ -434,7 +458,7 @@ function endNode(tr,which){return which==='start'?tr.nodes[0]:tr.nodes[tr.nodes.
 function nearEndPoint(tr,which){const f=flatten(tr);if(f.total<1e-6)return endNode(tr,which);
   const d=Math.min(15,f.total*0.3);return atArc(f,which==='start'?d/f.total:1-d/f.total).p;}
 
-function resolveAll(){const ids=new Map(doc.elements.map(e=>[e.id,e]));
+function resolveAll(){settleSN();const ids=new Map(doc.elements.map(e=>[e.id,e]));
   for(const el of doc.elements)if(el.type==='traj')resolveTraj(el,ids);}
 function resolveTraj(tr,ids){
   for(const which of ['start','end']){const b=tr[which];if(!b)continue;const tg=ids.get(b.el);
@@ -459,7 +483,7 @@ function isSepBinding(b){if(!b)return false;const tg=byId(b.el);if(!tg||tg.type!
 function compat(tg,b,role,tr,which,opt={}){
   const no=why=>({ok:false,why}),yes={ok:true};
   if(tg.type==='eq'){const pr=portRole(tg,b.port);if(!pr)return no('no such terminal');
-    if(pr.role!==role){
+    if(pr.role!==role&&pr.role!=='any'){
       if(pr.sep)return no(pr.role==='start'?`that is an unstable separatrix of ${elName(tg)}: the flow leaves there`:`that is a stable separatrix of ${elName(tg)}: the flow arrives there`);
       return no(role==='end'?`the flow cannot end in a ${pr.role==='start'?'repelling':''} ${EQNAME[tg.kind]}`:`the flow cannot start from an attracting ${EQNAME[tg.kind]}`);}
     if(pr.single&&!opt.ignoreUse){const other=doc.elements.find(e=>e.type==='traj'&&e!==tr&&
@@ -519,7 +543,7 @@ function validate(){
   const curves=[];
   for(const el of els){
     if(isPath(el)&&el.nodes.length>=2){const f=flatten(el);curves.push({el,kind:el.type,pts:f.pts,closed:!!el.closed,ch:chunkify(f.pts)});}
-    else if(el.type==='eq'){for(const q of eqPorts(el))if(q.dir){const r=portRole(el,q.port),c={x:el.x,y:el.y};
+    else if(el.type==='eq'){for(const q of eqPorts(el))if(q.dir&&!q.hidden){const r=portRole(el,q.port),c={x:el.x,y:el.y};
       const pts=r.role==='start'?[c,q.pos]:[q.pos,c];curves.push({el,kind:'stub',port:q.port,tip:q.pos,pts,closed:false,ch:chunkify(pts)});}}}
   const attach=cv=>{const A=[];
     if(cv.kind==='stub'){A.push({eq:cv.el.id,pos:{x:cv.el.x,y:cv.el.y}},{eq:cv.el.id,pos:cv.tip});}
@@ -660,7 +684,7 @@ function renderElement(el,exp){
   else if(el.type==='eq'){const c={x:el.x,y:el.y},col=colOf(el,INK);s+=`<g${gid}>`;/* colour applies to the glyph only, never to the separatrix stubs */
     if(sel)s+=`<circle cx="${f2(c.x)}" cy="${f2(c.y)}" r="${f2(R_EQ+5/k)}" fill="${SELC}" fill-opacity=".25"/>`;
     if(!exp)s+=`<circle cx="${f2(c.x)}" cy="${f2(c.y)}" r="${f2(Math.max(R_EQ+2,9/k))}" fill="transparent"/>`;
-    for(const q of eqPorts(el))if(q.dir){const r=portRole(el,q.port);
+    for(const q of eqPorts(el))if(q.dir&&!q.hidden){const r=portRole(el,q.port);
       if(!exp)s+=`<path d="M${P(c)}L${P(q.pos)}" stroke="transparent" stroke-width="${hw}"/>`;
       s+=`<path d="M${P(c)}L${P(q.pos)}" stroke="${INK}" stroke-width="${SW(W_SEP)}"/>`;
       const mid=vadd(c,vmul(q.dir,el.len*0.58));s+=`<path d="${arrowHead(mid,r.role==='start'?q.dir:vmul(q.dir,-1),7.5,6)}" fill="${INK}"/>`;}
@@ -670,7 +694,7 @@ function renderElement(el,exp){
     if(el.kind==='sink')s+=`<circle cx="${f2(c.x)}" cy="${f2(c.y)}" r="${R_EQ}" fill="${col}"/>`;
     else if(el.kind==='source')s+=`<circle cx="${f2(c.x)}" cy="${f2(c.y)}" r="${R_EQ}" fill="#fff" stroke="${col}" stroke-width="${SW(1.3)}"/>`;
     else if(el.kind==='saddle')s+=`<circle cx="${f2(c.x)}" cy="${f2(c.y)}" r="2.6" fill="${col}"/>`;
-    else if(el.kind==='sn'){const r=R_EQ+0.5;const nodeSide=el.angle+180,fillMid=el.trans==='stable'?nodeSide:el.angle;
+    else if(el.kind==='sn'){const r=R_EQ+0.5;const nodeSide=el.angle+180,fillMid=el.trans!=='unstable'?nodeSide:el.angle;
       s+=`<circle cx="${f2(c.x)}" cy="${f2(c.y)}" r="${r}" fill="#fff" stroke="${col}" stroke-width="${SW(1.3)}"/>`;
       s+=`<path d="${halfDiscD(c,r,fillMid)}" fill="${col}"/>`;}
     s+='</g>';}
@@ -1064,7 +1088,7 @@ function fillBarriers(){const out=[];/* every curve bounds a fill: list of polyl
       const onC=w=>{const bd=el[w];const tg=bd&&byId(bd.el);return tg&&tg.type==='cycle'?pathPt(tg,bd.t):null;};
       const a=onC('start'),z=onC('end');if(a)pts.unshift(a);if(z)pts.push(z);out.push(pts);}
     else if(el.type==='cycle'||el.type==='boundary')out.push(flatten(el).pts);
-    else if(el.type==='eq')for(const q of eqPorts(el))if(q.dir)out.push([{x:el.x,y:el.y},q.pos]);}
+    else if(el.type==='eq')for(const q of eqPorts(el))if(q.dir&&!q.hidden)out.push([{x:el.x,y:el.y},q.pos]);}
   return out;}
 function fillAt(p){/* topmost existing fill containing p */
   const fs=doc.elements.filter(e=>e.type==='fill');
@@ -1295,7 +1319,8 @@ function renderPanel(){const box=$('props');const els=selEls();let h='';
     if(el.type==='eq'){const kinds=[['sink','Sink'],['source','Source'],['saddle','Saddle']];if(!doc.structStable||el.kind==='sn')kinds.push(['sn','Saddle-node']);
       h+=row('Type',sel_('kind',el.kind,kinds));
       if(el.kind==='sink'||el.kind==='source')h+=row('Rotation',sel_('spiral',el.spiral||'none',[['none','none (node)'],['ccw','focus, counter-clockwise'],['cw','focus, clockwise']]));
-      if(el.kind==='sn')h+=row('Transversally',sel_('trans',el.trans,[['stable','stable (node sector attracts)'],['unstable','unstable (node sector repels)']]));
+      if(el.kind==='sn'){h+=row('Transversally',sel_('trans',el.trans||'stable',[['stable','stable (node sector attracts)'],['unstable','unstable (node sector repels)'],['open','open (1-d, decided later)']]));
+        if(el.trans==='open')h+=`<p class="hint">Drawn as a 1-d point on its centre line. The transversal terminals are hidden but still snap: attaching a trajectory that arrives there makes the saddle-node transversally stable, one that leaves makes it transversally unstable.</p>`;}
       if(el.kind==='saddle'||el.kind==='sn'){h+=row(el.kind==='saddle'?'Unstable dir. (°)':'Centre dir. (°)',num('angle',el.angle,5));
         if(el.kind==='saddle')h+=row('Angle to stable (°)',num('spread',el.spread,5,10,170));
         h+=row('Separatrix stub',num('len',el.len,2,10,120));}
@@ -1332,6 +1357,8 @@ $('props').addEventListener('change',e=>{const t=e.target;
   const before=st.textBefore||snapshot();st.textBefore=null;
   let v=t.type==='number'||t.type==='range'?parseFloat(t.value):t.value;if(t.type==='number'&&!isFinite(v))return;
   if(prop==='arrows')v=clamp(Math.round(v),0,8);
+  if(prop==='trans'&&el.type==='eq'){const err=convertSN(el,v);st.snTrans=el.trans;savePrefs();
+    if(err){setMsg('Cannot change: '+err,true);st.panelDirty=true;refresh();return;}commit(before,'Saddle-node: transversally '+v);return;}
   if(prop==='text'){el.text=v;}else el[prop]=v;
   if(prop==='kind'&&v==='sn'&&doc.structStable){el.kind='saddle';}
   commit(before,'Changed '+prop);});
@@ -1630,7 +1657,7 @@ function tikz(){const S=50,X=p=>`(${(p.x/S).toFixed(3)},${(-p.y/S).toFixed(3)})`
     else if(el.type==='traj'){const w=trajWidth(el),ak=arrowK(w,W_SEP);const base=w===W_SEP?'sep':w===W_TRAJ?'traj':'line width='+W(w*lb);
       L.push(`\\draw${opt(base,cn)} ${pathT(el)};`);L.push(...pathHeads(el,arrowFracs(el.arrows,el.arrowPos),1,8*ak,6.2*ak,cn));}
     else if(el.type==='eq'){const c={x:el.x,y:el.y};
-      for(const q of eqPorts(el))if(q.dir){const r=portRole(el,q.port);const [a,b]=r.role==='start'?[c,q.pos]:[q.pos,c];
+      for(const q of eqPorts(el))if(q.dir&&!q.hidden){const r=portRole(el,q.port);const [a,b]=r.role==='start'?[c,q.pos]:[q.pos,c];
         L.push(`\\draw[sep] ${X(a)} -- ${X(b)};`);L.push(head(vadd(c,vmul(q.dir,el.len*0.58)),r.role==='start'?q.dir:vmul(q.dir,-1),7.5,6));}
       if((el.kind==='sink'||el.kind==='source')&&el.spiral&&el.spiral!=='none'){const pts=spiralPts(el);
         L.push(`\\draw${opt('line width='+W(1.1*lb),cn)} ${pts.map(X).join(' -- ')};`);L.push(head(pts[24],vnorm(vsub(pts[25],pts[23])),6.5,5,cn));}
@@ -1638,7 +1665,7 @@ function tikz(){const S=50,X=p=>`(${(p.x/S).toFixed(3)},${(-p.y/S).toFixed(3)})`
       if(el.kind==='sink')L.push(`\\fill${opt(cn)} ${X(c)} circle (${r});`);
       else if(el.kind==='source')L.push(`\\filldraw[fill=white${dc},line width=${W(1.3*lb)}] ${X(c)} circle (${r});`);
       else if(el.kind==='saddle')L.push(`\\fill${opt(cn)} ${X(c)} circle (${(2.6/S).toFixed(3)});`);
-      else if(el.kind==='sn'){const rr=((R_EQ+0.5)/S).toFixed(3);const mid=el.trans==='stable'?el.angle+180:el.angle;const a0=mid-90;
+      else if(el.kind==='sn'){const rr=((R_EQ+0.5)/S).toFixed(3);const mid=el.trans!=='unstable'?el.angle+180:el.angle;const a0=mid-90;
         L.push(`\\filldraw[fill=white${dc},line width=${W(1.3*lb)}] ${X(c)} circle (${rr});`);
         L.push(`\\fill${opt(cn)} ${X(c)} -- ++(${f2(a0)}:${rr}) arc[start angle=${f2(a0)},end angle=${f2(a0+180)},radius=${rr}] -- cycle;`);}}
     else if(el.type==='label'){const fs=((el.size||16)/S*28.4527).toFixed(1);
@@ -1686,7 +1713,7 @@ $('cSS').onchange=e=>{const before=snapshot();doc.structStable=e.target.checked;
   st.undo.push(before);st.redo=[];autosave();st.panelDirty=true;setMsg(doc.structStable?'Structural stability enforced':'Codimension-one elements enabled (saddle-node, semi-stable orbits, saddle connections)');refresh();};
 $('bHelp').onclick=()=>openModal('helpModal');
 $('bExample').onclick=()=>{closeModals();loadDoc(exampleDoc());setMsg('Example loaded');};
-function savePrefs(){try{localStorage.setItem('phaseplane-prefs2',JSON.stringify({grid:st.grid,snapGrid:st.snapGrid,magnet:st.magnet,refuse:st.refuse,smoothing:st.smoothing,fillColor:st.fillColor}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem('phaseplane-prefs2',JSON.stringify({grid:st.grid,snapGrid:st.snapGrid,magnet:st.magnet,refuse:st.refuse,smoothing:st.smoothing,fillColor:st.fillColor,snTrans:st.snTrans}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('phaseplane-prefs2')||'null');if(p){Object.assign(st,p);}}catch(e){}
   $('cGrid').checked=st.grid;$('cSnapGrid').checked=st.snapGrid;$('cMagnet').checked=st.magnet;$('cRefuse').checked=st.refuse;}
 function layoutTools(){const t=$('tools');t.classList.remove('two');if(t.scrollHeight>t.clientHeight+1)t.classList.add('two');}

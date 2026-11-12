@@ -17,7 +17,7 @@ A browser tool for sketching qualitative phase portraits of planar flows, the ki
 | Sink | `1` | Filled disc. Can be shown as a focus (cw/ccw spiral). |
 | Source | `2` | Open disc. Can be shown as a focus. |
 | Saddle | `3` | Has 4 terminals: two unstable separatrices (pointing out) and two stable ones (pointing in). Drag the diamond handles to rotate it or to change the angle between its eigendirections. |
-| Saddle-node | `4` | Codimension 1, only when *Structurally stable* is off. Transversally stable or unstable. Half-filled disc on the node side, with three separatrix terminals plus the node sector. |
+| Saddle-node | `4` | Codimension 1, only when *Structurally stable* is off. Transversally stable, unstable or *open*. Half-filled disc on the node side, with three separatrix terminals plus the node sector. *Open* draws it as a point of a 1-d phase portrait (see below). |
 | Periodic orbit | `C` | Click for an ellipse, or draw a closed loop. Stable = solid, unstable = dashed. Semi-stable (codim 1) = solid with a dashed shadow on the repelling side. Arrows show the orientation. |
 | Boundary | `B` | A transversal the flow crosses in one direction only, shown by small crossing arrows (dark orange by default). A closed loop is created as an *inflow* boundary (trapping region); flip it in the panel. |
 | Background fill | `F` | Colours a region, e.g. a basin of attraction (see *Background fills* below). |
@@ -47,6 +47,14 @@ A browser tool for sketching qualitative phase portraits of planar flows, the ki
 * **View:** the mouse wheel zooms around the cursor; `+`/`−` zoom and `0` fits the drawing.
 * **Colour and line width:** see *Colours and line widths* below.
 * **Panels:** the right panel edits the selected element (type, rotation, stability, arrows, colour, line width, …). With nothing selected it shows drawing-wide settings: arrow size and freehand smoothing.
+
+## 1-d phase portraits: saddle-nodes with open transversal direction
+
+Setting a saddle-node's *Transversally* to **open (1-d, decided later)** draws it as a point of a 1-d phase portrait: only the centre line, with a stub on each side (the flow arrives on the filled side and leaves on the other). Sources and sinks look the same in 1-d and 2-d, so a 1-d phase portrait along a horizontal line can be drawn with sinks, sources and open saddle-nodes.
+
+* The transversal terminals are hidden but still snap. Attaching a trajectory that **arrives** there makes the saddle-node transversally **stable**; one that **leaves** makes it transversally **unstable**. Trajectories already attached are moved to the matching 2-d terminals: on the filled side, the stub becomes the node sector. The glyph and the flow along the centre line stay as they were; for *unstable* the element is turned by 180°.
+* The panel can switch between *open*, *stable* and *unstable* directly. Switching back to *open* is refused while trajectories are attached to the transversal terminals.
+* New saddle-nodes take the transversal setting chosen last, so a series of 1-d saddle-nodes can be placed one after the other.
 
 ## Colours and line widths
 
