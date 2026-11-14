@@ -197,6 +197,27 @@ Implemented as `trans: 'open'` (panel: "open (1-d, decided later)").
 * Panel changes of `trans` go through `convertSN`. The last choice is stored as `st.snTrans` (preferences) and used by `mkEq` for new saddle-nodes.
 * Compatibility: existing stable and unstable saddle-nodes and all other files export identically (checked against the Round 20 version).
 
+### Round 22
+> A common scenario is a saddle-node appearing on a periodic orbit (saddle-node on limit cycle). This is at the moment hard to sketch.
+>
+> * Make it possible to split periodic orbits,
+> * shorten the stubs of the saddle-node to make it fit easily into a split trajectory.
+> Check and implement if easily doable, and commit.
+
+Changes:
+* `canSplit` accepts any selected node of a cycle. `splitAtNode` (key `X`, panel *Split at node*) calls `splitCycle(el, i, false)`. The new panel button *Saddle-node here* calls `splitCycle(el, i, true)`.
+* `splitCycle`:
+  * computes the arc position s₀ of node i and cuts at s₀ ± g. g = 4 (or T/40) for a plain split; for a saddle-node, g = the stub length `clamp(T/14, 8, 18)`.
+  * `nodeAtT` inserts the cut nodes exactly, by de Casteljau splitting; the larger parameter goes first so indices stay valid.
+  * The nodes from the forward cut around to the backward cut become a trajectory, reversed (handles swapped) when `dir = −1` so that it runs with the flow. It takes over `color`, `lw`, `width` and `arrows` and replaces the cycle in the element list. Bindings of other trajectories to the cycle are cleared and counted in the status message.
+  * With a saddle-node: placed at node i with `angle` = flow tangent.
+    * stable orbit → `trans: stable`, trajectory `cm → c`;
+    * unstable orbit → `trans: unstable`, angle + 180°, trajectory `c → cm`;
+    * semi-stable orbit → `trans: open`, trajectory `cm → cn`.
+    * Refused while *Structurally stable* is on. The commit uses `force` like the trajectory split.
+* New saddle-nodes get stub length `SN_LEN = 18` (was 30; other equilibria unchanged). Stub arrows are placed at `stubArrowAt(e) = max(0.58·len, R_EQ + 1.5 + 3.75·AS())`, which keeps them clear of the glyph for short stubs and is unchanged for the old lengths.
+* Compatibility: existing files (including saddle-nodes with stored `len: 30`) export identically to Round 21.
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)

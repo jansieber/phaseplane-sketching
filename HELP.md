@@ -35,6 +35,10 @@ A browser tool for sketching qualitative phase portraits of planar flows, the ki
   * To split at a place without a node, double-click the curve there first to insert one.
   * Dropping a free end back onto the other piece's free start joins them again.
   * Open boundaries can be split the same way.
+* **Splitting periodic orbits / saddle-node on an invariant circle:** select an orbit, click one of its square nodes, then:
+  * **Split at node** (`X`) opens the orbit into a trajectory in the direction of the flow, with a small gap at that node. The trajectory keeps the orbit's colour, width and number of arrows. Trajectories that were attached to the orbit become free.
+  * **Saddle-node here** does the same and puts a saddle-node into the gap, aligned with the flow. The trajectory then runs from the saddle-node around and back into it (saddle-node on an invariant circle, SNIC). A stable orbit gives a transversally stable saddle-node, an unstable orbit an unstable one, and a semi-stable orbit an *open* (1-d) one. Needs *Structurally stable* off.
+  * Saddle-nodes have short stubs (length 18; adjustable as *Separatrix stub* in the panel), so they fit onto a curve.
 * **Joining:** drop the free end of a trajectory on the free start of another (or draw a new one starting or ending there) to merge them into one trajectory.
 * **Simplify** (`S` or panel button): smooths the selected curve(s) and refits them with about 30% fewer nodes. Press repeatedly to straighten wobbly hand-drawn curves. The smoothing applied to freehand strokes (low/medium/high) is set in the right panel when nothing is selected.
 * **Other keys:**

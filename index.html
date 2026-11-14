@@ -211,7 +211,7 @@ hr.sepl{border:0;border-top:1px solid var(--line);margin:10px -12px}
   <h4>Editing</h4>
   <table>
   <tr><td><b>Select</b> <kbd>V</kbd></td><td>Click or drag a rectangle to select; <kbd>Shift</kbd> adds. Drag to move. Corner handles scale uniformly (<kbd>Shift</kbd>: free, <kbd>Alt</kbd>: about the centre), edge handles stretch one direction, the round handle on top rotates (<kbd>Shift</kbd>: 15° steps).</td></tr>
-  <tr><td>Nodes</td><td>A single selected curve shows its Bézier nodes (squares) and handles (dots). Drag them; <kbd>Alt</kbd>-drag a handle to break smoothness. Double-click a curve to insert a node, double-click a node to toggle smooth/corner, select a node and press <kbd>Del</kbd> to remove it, or <kbd>X</kbd> to <b>split</b> the trajectory there into two (e.g. to show separatrix splitting; drag the new ends apart – dropping a free end back on the other's free start joins them again). Dragging a bound end of a trajectory detaches it; drop it near a target to re-attach.</td></tr>
+  <tr><td>Nodes</td><td>A single selected curve shows its Bézier nodes (squares) and handles (dots). Drag them; <kbd>Alt</kbd>-drag a handle to break smoothness. Double-click a curve to insert a node, double-click a node to toggle smooth/corner, select a node and press <kbd>Del</kbd> to remove it, or <kbd>X</kbd> to <b>split</b> the trajectory there into two (e.g. to show separatrix splitting; drag the new ends apart – dropping a free end back on the other's free start joins them again). On a periodic orbit, <kbd>X</kbd> opens the orbit into a trajectory, and the panel button <b>Saddle-node here</b> also puts a saddle-node into the gap (saddle-node on an invariant circle). Dragging a bound end of a trajectory detaches it; drop it near a target to re-attach.</td></tr>
   <tr><td>Saddles</td><td>Select a saddle and drag the diamond handles to rotate it or change the angle between its eigendirections.</td></tr>
   <tr><td>Keys</td><td><kbd>Del</kbd> delete, <kbd>Ctrl+D</kbd> duplicate (never refused, so you can drag the copy into place), <kbd>S</kbd> simplify, <kbd>R</kbd> reverse trajectory/orbit, <kbd>Ctrl+A</kbd> select all, arrow keys nudge, <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Shift+Z</kbd> undo/redo, <kbd>Esc</kbd> back to Select.</td></tr>
   <tr><td>View</td><td>Mouse wheel zooms around the cursor; pan with <kbd>Space</kbd>+drag, the middle mouse button or the hand tool <kbd>H</kbd>; <kbd>0</kbd> fits the drawing.</td></tr>
@@ -353,6 +353,7 @@ function ellipseNodes(cx,cy,rx,ry,n=8){const k=4/3*Math.tan(Math.PI/(2*n)),N=[];
    Model
    ===================================================================== */
 const INK='#111', BNDC='#c26b00', SELC='#2f81f7';
+const SN_LEN=18;/* default stub length of new saddle-nodes (short, so they fit into a split periodic orbit) */
 const R_EQ=4.5, SNAP_PX=14, CYC_OFF=2.5, W_TRAJ=1.3, W_SEP=2.0, W_CYC=2.1, W_BND=1.5;
 /* optional per-element style: el.color (any CSS hex colour) on every element, el.width (px) on trajectories, orbits, boundaries.
    Missing fields mean the built-in defaults, so files written before these fields existed look exactly as before. */
@@ -385,7 +386,7 @@ const isPath=el=>el&&(el.type==='traj'||el.type==='cycle'||el.type==='boundary')
 /* fills (decorative background regions) have nodes like a closed path but take no part in snapping or consistency checks */
 const hasNodes=el=>isPath(el)||(el&&el.type==='fill');
 
-function mkEq(kind,x,y){return {id:doc.nextId++,type:'eq',kind,x,y,angle:0,spread:90,len:30,spiral:'none',trans:kind==='sn'&&st.snTrans?st.snTrans:'stable'};}
+function mkEq(kind,x,y){return {id:doc.nextId++,type:'eq',kind,x,y,angle:0,spread:90,len:kind==='sn'?SN_LEN:30,spiral:'none',trans:kind==='sn'&&st.snTrans?st.snTrans:'stable'};}
 function mkTraj(nodes){return {id:doc.nextId++,type:'traj',nodes,start:null,end:null,arrows:1,arrowPos:0.5};}
 function mkCycle(nodes,stability){return {id:doc.nextId++,type:'cycle',nodes,closed:true,stability,dir:1,arrows:2};}
 function mkBoundary(nodes,closed){return {id:doc.nextId++,type:'boundary',nodes,closed,dir:1,spacing:36};}
@@ -442,6 +443,7 @@ function settleSN(){for(const e of doc.elements){if(e.type!=='eq'||e.kind!=='sn'
     for(const tr of doc.elements){if(tr.type!=='traj')continue;
       if(tr.end&&tr.end.el===e.id&&(tr.end.port==='h1'||tr.end.port==='h2')){convertSN(e,'stable');break;}
       if(tr.start&&tr.start.el===e.id&&(tr.start.port==='h1'||tr.start.port==='h2')){convertSN(e,'unstable');break;}}}}
+const stubArrowAt=e=>Math.max(e.len*0.58,R_EQ+1.5+3.75*AS());
 function eqIndex(e){return e.kind==='saddle'?-1:e.kind==='sn'?0:1;}
 function cycleRole(stab,side){/* side +1 = trajectory lies inside the orbit */
   if(stab==='stable')return 'end';if(stab==='unstable')return 'start';
@@ -687,7 +689,7 @@ function renderElement(el,exp){
     for(const q of eqPorts(el))if(q.dir&&!q.hidden){const r=portRole(el,q.port);
       if(!exp)s+=`<path d="M${P(c)}L${P(q.pos)}" stroke="transparent" stroke-width="${hw}"/>`;
       s+=`<path d="M${P(c)}L${P(q.pos)}" stroke="${INK}" stroke-width="${SW(W_SEP)}"/>`;
-      const mid=vadd(c,vmul(q.dir,el.len*0.58));s+=`<path d="${arrowHead(mid,r.role==='start'?q.dir:vmul(q.dir,-1),7.5,6)}" fill="${INK}"/>`;}
+      const mid=vadd(c,vmul(q.dir,stubArrowAt(el)));s+=`<path d="${arrowHead(mid,r.role==='start'?q.dir:vmul(q.dir,-1),7.5,6)}" fill="${INK}"/>`;}
     if((el.kind==='sink'||el.kind==='source')&&el.spiral&&el.spiral!=='none'){const pts=spiralPts(el);
       s+=`<path d="${polyD(pts,false)}" fill="none" stroke="${col}" stroke-width="${SW(1.1)}"/>`;
       const i=24;s+=`<path d="${arrowHead(pts[i],vnorm(vsub(pts[i+1],pts[i-1])),6.5,5)}" fill="${col}"/>`;}
@@ -1208,9 +1210,48 @@ function insertNode(el,p){const before=snapshot();const nr=nearestOnPath(el,p);c
   const m=L[3];const nd={x:m.x,y:m.y,ix:L[2].x-m.x,iy:L[2].y-m.y,ox:R[1].x-m.x,oy:R[1].y-m.y,smooth:true};
   el.nodes.splice(i+1,0,nd);rebindTo(el);st.sel=new Set([el.id]);st.selNode={id:el.id,i:i+1};commit(before,'Node inserted');}
 function canSplit(el){const sn=st.selNode;if(!sn||!el||sn.id!==el.id)return false;
+  if(el.type==='cycle')return sn.i>=0&&sn.i<el.nodes.length;
   return (el.type==='traj'||(el.type==='boundary'&&!el.closed))&&sn.i>0&&sn.i<el.nodes.length-1;}
+/* insert a node at segment parameter t of el without changing the curve; returns {idx, added} */
+function nodeAtT(el,t){const n=el.nodes.length,S=segsOf(el);let i=Math.floor(t),u=t-i;
+  if(u<0.01)return {idx:((i%n)+n)%n,added:false};if(u>0.99)return {idx:(i+1)%n,added:false};
+  i=clamp(i,0,S.length-1);const [L,R]=bzSplit(...S[i],u);const A=el.nodes[i],B=el.nodes[(i+1)%n];
+  A.ox=L[1].x-A.x;A.oy=L[1].y-A.y;B.ix=R[2].x-B.x;B.iy=R[2].y-B.y;const m=L[3];
+  el.nodes.splice(i+1,0,{x:m.x,y:m.y,ix:L[2].x-m.x,iy:L[2].y-m.y,ox:R[1].x-m.x,oy:R[1].y-m.y,smooth:true});return {idx:i+1,added:true};}
+/* open a periodic orbit at node i into a trajectory (in flow direction) with a small gap; with withSN a saddle-node is placed
+   in the gap and the trajectory runs from it around back into it (saddle-node on an invariant circle) */
+function splitCycle(el,i,withSN){
+  if(withSN&&doc.structStable){setMsg('Saddle-nodes need “Structurally stable” switched off',true);return;}
+  const before=snapshot(),fl=flatten(el),T=fl.total,P={x:el.nodes[i].x,y:el.nodes[i].y};
+  const p0=fl.pts.find(q=>Math.abs(q.t-i)<1e-9)||fl.pts[0],s0=p0.s;
+  const len=clamp(T/14,8,SN_LEN),g=withSN?len:Math.min(4,T/40);
+  const tAt=sv=>atArc(fl,(((sv%T)+T)%T)/T).t;let tA=tAt(s0+g),tB=tAt(s0-g);
+  const tan=vmul(atArc(fl,s0/T).tan,el.dir||1);
+  /* insert the two cut nodes (larger parameter first so the smaller index stays valid) */
+  let iA,iB;
+  if(tA>tB){const a=nodeAtT(el,tA);const b=nodeAtT(el,tB);iA=a.idx+(b.added&&b.idx<=a.idx?1:0);iB=b.idx;}
+  else{const b=nodeAtT(el,tB);const a=nodeAtT(el,tA);iB=b.idx+(a.added&&a.idx<=b.idx?1:0);iA=a.idx;}
+  const n=el.nodes.length,list=[];for(let k=iA;;k=(k+1)%n){list.push({...el.nodes[k]});if(k===iB||list.length>n)break;}
+  if(list.length<2){doc=JSON.parse(before);setMsg('Orbit too small to split',true);return;}
+  if((el.dir||1)<0){list.reverse();for(const nd of list){[nd.ix,nd.iy,nd.ox,nd.oy]=[nd.ox,nd.oy,nd.ix,nd.iy];}}
+  list[0].ix=list[0].iy=0;list[list.length-1].ox=list[list.length-1].oy=0;
+  const tr=mkTraj(list);tr.arrows=Math.max(1,el.arrows??1);
+  for(const k of ['color','lw','width'])if(el[k]!==undefined)tr[k]=el[k];
+  let detached=0;for(const o of doc.elements)if(o.type==='traj')for(const w of ['start','end'])if(o[w]&&o[w].el===el.id){o[w]=null;detached++;}
+  doc.elements.splice(doc.elements.indexOf(el),1,tr);
+  let msg='Orbit opened into a trajectory';
+  if(withSN){const th=Math.atan2(-tan.y,tan.x)/D2R,trans=el.stability==='stable'?'stable':el.stability==='unstable'?'unstable':'open';
+    const e=mkEq('sn',P.x,P.y);e.len=len;e.trans=trans;
+    if(trans==='unstable'){e.angle=((th+180)%360+360)%360;tr.start={el:e.id,port:'c'};tr.end={el:e.id,port:'cm'};}
+    else{e.angle=((th%360)+360)%360;tr.start={el:e.id,port:'cm'};tr.end={el:e.id,port:trans==='stable'?'c':'cn'};}
+    doc.elements.push(e);st.sel=new Set([e.id]);
+    msg=`Saddle-node placed on the orbit (transversally ${trans==='open'?'open':trans}); the orbit is now a trajectory from the saddle-node back into it`;}
+  else{st.sel=new Set([tr.id]);msg+=' – drag its ends onto a saddle-node (or use “Saddle-node here” on an orbit node to split and insert one in one step)';}
+  st.selNode=null;if(detached)msg+=` (${detached} trajectory end${detached>1?'s':''} attached to the orbit detached)`;
+  commit(before,msg,{force:true});}
 function splitAtNode(){const sn=st.selNode,el=sn&&byId(sn.id);
   if(!canSplit(el)){setMsg('Select an inner node first: click the trajectory, then one of its square nodes',true);return;}
+  if(el.type==='cycle'){splitCycle(el,sn.i,false);return;}
   const before=snapshot(),i=sn.i,B=structuredClone(el);B.id=doc.nextId++;
   el.nodes=el.nodes.slice(0,i+1).map(n=>({...n}));B.nodes=B.nodes.slice(i);
   const a=el.nodes[i],b=B.nodes[0];a.ox=0;a.oy=0;a.smooth=false;b.ix=0;b.iy=0;b.smooth=false;
@@ -1332,7 +1373,8 @@ function renderPanel(){const box=$('props');const els=selEls();let h='';
     else if(el.type==='cycle'){const opts=[['stable','Stable'],['unstable','Unstable']];
       if(!doc.structStable||el.stability.startsWith('semi'))opts.push(['semi-inner','Semi-stable: attracts inside'],['semi-outer','Semi-stable: attracts outside']);
       h+=row('Stability',sel_('stability',el.stability,opts))+row('Arrows',num('arrows',el.arrows,1,0,8));
-      h+=`<div class="btns"><button data-act="rev">Reverse orientation (R)</button></div>`;}
+      h+=`<div class="btns"><button data-act="rev">Reverse orientation (R)</button>${canSplit(el)?'<button data-act="split">Split at node (X)</button><button data-act="snic">Saddle-node here</button>':''}</div>`;
+      if(!canSplit(el))h+=`<p class="hint">To split the orbit (e.g. for a saddle-node on the orbit), click one of its square nodes (double-click the orbit to add one). Then <i>Split at node</i> opens it into a trajectory, and <i>Saddle-node here</i> also puts a saddle-node into the gap.</p>`;}
     else if(el.type==='boundary'){
       if(el.closed){const f=flatten(el),a=atArc(f,0.1);const inflow=pointInPoly(f.pts,vadd(a.p,vmul(crossDirAt(el,a.tan),2)));
         h+=row('Type',`<span>closed, ${inflow?'<b>inflow</b> (trapping region)':'<b>outflow</b>'}</span>`);}
@@ -1374,6 +1416,7 @@ $('props').addEventListener('click',e=>{const ds=e.target.dataset||{};
   const a=ds.act;if(!a)return;
   if(a==='back'||a==='front'){const el=selEls()[0];if(!el)return;const before=snapshot();doc.elements=doc.elements.filter(x=>x!==el);
     if(a==='back')doc.elements.unshift(el);else doc.elements.push(el);commit(before,a==='back'?'Sent to back':'Brought to front');return;}
+  if(a==='snic'){const sn=st.selNode,el=sn&&byId(sn.id);if(el&&el.type==='cycle')splitCycle(el,sn.i,true);return;}
   if(a==='split')splitAtNode();else if(a==='simp')simplifySelected();else if(a==='del')deleteSelection();else if(a==='dup')duplicateSelection();else if(a==='rev')reverseSelected();
   else if(a==='detS'||a==='detE'){const el=selEls()[0];const before=snapshot();el[a==='detS'?'start':'end']=null;commit(before,'Detached');}});
 function renderProblems(){const v=st.valid;let h='<h3>Consistency</h3>';
@@ -1658,7 +1701,7 @@ function tikz(){const S=50,X=p=>`(${(p.x/S).toFixed(3)},${(-p.y/S).toFixed(3)})`
       L.push(`\\draw${opt(base,cn)} ${pathT(el)};`);L.push(...pathHeads(el,arrowFracs(el.arrows,el.arrowPos),1,8*ak,6.2*ak,cn));}
     else if(el.type==='eq'){const c={x:el.x,y:el.y};
       for(const q of eqPorts(el))if(q.dir&&!q.hidden){const r=portRole(el,q.port);const [a,b]=r.role==='start'?[c,q.pos]:[q.pos,c];
-        L.push(`\\draw[sep] ${X(a)} -- ${X(b)};`);L.push(head(vadd(c,vmul(q.dir,el.len*0.58)),r.role==='start'?q.dir:vmul(q.dir,-1),7.5,6));}
+        L.push(`\\draw[sep] ${X(a)} -- ${X(b)};`);L.push(head(vadd(c,vmul(q.dir,stubArrowAt(el))),r.role==='start'?q.dir:vmul(q.dir,-1),7.5,6));}
       if((el.kind==='sink'||el.kind==='source')&&el.spiral&&el.spiral!=='none'){const pts=spiralPts(el);
         L.push(`\\draw${opt('line width='+W(1.1*lb),cn)} ${pts.map(X).join(' -- ')};`);L.push(head(pts[24],vnorm(vsub(pts[25],pts[23])),6.5,5,cn));}
       const r=(R_EQ/S).toFixed(3),dc=cn?',draw='+cn:'';
