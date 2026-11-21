@@ -204,6 +204,7 @@ hr.sepl{border:0;border-top:1px solid var(--line);margin:10px -12px}
   <tr><td><b>Equilibria</b> <kbd>1</kbd>–<kbd>4</kbd></td><td>Sink, source, saddle (4 terminals: unstable separatrices point out, stable ones point in), saddle-node (only when structural stability is off).</td></tr>
   <tr><td><b>Periodic orbit</b> <kbd>C</kbd></td><td>Click for a default ellipse, or draw a closed loop. Stable = solid, unstable = dashed, semi-stable = solid with a dashed shadow on the repelling side.</td></tr>
   <tr><td><b>Boundary</b> <kbd>B</kbd></td><td>Draw a curve the flow crosses in one direction (shown by small arrows). A closed curve is created as inflowing (trapping region); flip it in the properties panel.</td></tr>
+  <tr><td><b>Annotation</b> <kbd>A</kbd></td><td>Plain lines and arrows (axes, bifurcation branches): never snapped to the phase portrait and never checked. Drag to draw; with <b>Straight</b> on (panel; or Shift) a drag gives a horizontal, vertical or 45° segment. Tap to place corners of a polyline and finish with ✓, a tap on the last node, a double-tap or <kbd>Enter</kbd> (tap the first node to close). Style (solid/dashed/dotted) and arrowheads are chosen in the panel. Trajectories and orbits can be converted to annotations and back.</td></tr>
   <tr><td><b>Background fill</b> <kbd>F</kbd></td><td>Choose the <b>active colour</b> in the right panel, then tap inside regions to fill them, e.g. the parts of a basin of attraction. The active colour applies to the taps that follow; tapping an existing fill recolours it, and with <b>no colour</b> (the crossed-out swatch) a tap removes a fill. A region is bounded by all curves, so a basin may need several taps; unclosed regions are cut at the edge of the view/drawing. Drag instead of tapping to draw a shape by hand. Fills are pure decoration: they lie under everything and are never checked. In Select mode, click inside a fill to select it.</td></tr>
   <tr><td><b>Region</b> <kbd>G</kbd></td><td>Drag a rectangle; a small bar offers <b>Copy image</b> (exactly that rectangle, as a picture for other apps) and <b>Copy sketch</b> (the elements lying completely inside, for pasting into this tool).</td></tr>
   <tr><td><b>Label</b> <kbd>L</kbd></td><td>Click to place text. Inside <code>$…$</code>: <code>_</code> subscript, <code>^</code> superscript, <code>\alpha</code> etc.</td></tr>
@@ -379,18 +380,21 @@ const AS=()=>(doc&&doc.arrowScale)||1;
 let doc=newDoc();
 const st={tool:'select',sel:new Set(),selNode:null,drag:null,pen:null,view:{x:-500,y:-350,k:1},space:false,
   refuse:false,smoothing:'medium',grid:true,snapGrid:false,magnet:true,flash:null,valid:{hard:[],warn:[]},hardKeys:new Set(),
-  undo:[],redo:[],msg:'',msgBad:false,mouse:null,panelDirty:true,fillColor:'#dbe9ff'};
+  undo:[],redo:[],msg:'',msgBad:false,mouse:null,panelDirty:true,fillColor:'#dbe9ff',annot:{dash:'solid',heads:'end'},annotStraight:false};
 const byId=id=>doc.elements.find(e=>e.id===id);
 const fakeTraj=p=>({type:'traj',nodes:[{x:p.x,y:p.y,ix:0,iy:0,ox:0,oy:0},{x:p.x,y:p.y,ix:0,iy:0,ox:0,oy:0}],start:null,end:null});
 const isPath=el=>el&&(el.type==='traj'||el.type==='cycle'||el.type==='boundary');
 /* fills (decorative background regions) have nodes like a closed path but take no part in snapping or consistency checks */
-const hasNodes=el=>isPath(el)||(el&&el.type==='fill');
+const hasNodes=el=>isPath(el)||(el&&(el.type==='fill'||el.type==='annot'));
 
 function mkEq(kind,x,y){return {id:doc.nextId++,type:'eq',kind,x,y,angle:0,spread:90,len:kind==='sn'?SN_LEN:30,spiral:'none',trans:kind==='sn'&&st.snTrans?st.snTrans:'stable'};}
 function mkTraj(nodes){return {id:doc.nextId++,type:'traj',nodes,start:null,end:null,arrows:1,arrowPos:0.5};}
 function mkCycle(nodes,stability){return {id:doc.nextId++,type:'cycle',nodes,closed:true,stability,dir:1,arrows:2};}
 function mkBoundary(nodes,closed){return {id:doc.nextId++,type:'boundary',nodes,closed,dir:1,spacing:36};}
 function mkLabel(x,y,text){return {id:doc.nextId++,type:'label',x,y,text,size:16};}
+/* annotation: a plain line/curve (axes, bifurcation branches, arrows). Like a label it takes no part in snapping or checks.
+   dash ∈ {solid,dashed,dotted}; heads ∈ {none,end,both,mid} */
+function mkAnnot(nodes,closed){return {id:doc.nextId++,type:'annot',nodes,closed:!!closed,dash:st.annot.dash,heads:closed&&st.annot.heads!=='mid'?'none':st.annot.heads};}
 function mkFill(nodes,holes,color){const el={id:doc.nextId++,type:'fill',nodes,closed:true,color};if(holes&&holes.length)el.holes=holes;return el;}
 
 const EQNAME={sink:'sink',source:'source',saddle:'saddle',sn:'saddle-node'};
@@ -400,6 +404,7 @@ function elName(el){if(!el)return '?';
   if(el.type==='cycle')return ({stable:'stable',unstable:'unstable','semi-inner':'semi-stable','semi-outer':'semi-stable'})[el.stability]+' periodic orbit #'+el.id;
   if(el.type==='boundary')return 'boundary #'+el.id;
   if(el.type==='fill')return 'background fill #'+el.id;
+  if(el.type==='annot')return 'annotation #'+el.id;
   return 'label #'+el.id;}
 
 function eqPorts(e){const Pp=[],c={x:e.x,y:e.y};
@@ -653,6 +658,17 @@ function labelSVG(el,extra=''){const fs=el.size||16;let s=`<text x="${f2(el.x)}"
 function labelBox(el){const fs=el.size||16;const w=Math.max(8,labelRuns(el.text||'').reduce((a,r)=>a+r.t.length*(r.sh?0.7:1),0)*fs*0.52);
   return {x0:el.x-w/2,y0:el.y-fs*0.6,x1:el.x+w/2,y1:el.y+fs*0.6};}
 
+/* dash pattern and arrowheads of annotations (shared by screen, SVG/PDF and TikZ) */
+function annotDashArr(el,w){const W_=w*LB();if(el.dash==='dashed')return [6*Math.max(1,W_/1.3),4*Math.max(1,W_/1.3)];if(el.dash==='dotted')return [0.01,Math.max(3,W_*2.6)];return null;}
+function annotDash(el,w){const a=annotDashArr(el,w);if(!a)return ' stroke-linejoin="round"';
+  return ` stroke-dasharray="${a.map(f2).join(' ')}"${el.dash==='dotted'?' stroke-linecap="round"':''} stroke-linejoin="round"`;}
+function annotHeads(el,ak){const fl=flatten(el),P_=fl.pts,out=[];if(P_.length<2||fl.total<1)return out;const L=8*ak*AS();
+  const h=el.heads||'none';
+  if(h==='mid'){const a=atArc(fl,0.5);out.push({p:a.p,t:a.tan});return out;}
+  if(el.closed)return out;
+  /* end arrows: tip exactly at the end point, direction from the curve a little before the end */
+  const at=(f,sg)=>{const a=atArc(fl,f),b=atArc(fl,clamp(f-sg*Math.min(0.5,L/fl.total),0,1));const t=vnorm(vsub(a.p,b.p));return {p:vsub(a.p,vmul(t,L/2)),t};};
+  if(h==='end'||h==='both')out.push(at(1,1));if(h==='both')out.push(at(0,-1));return out;}
 function fillD(el){let d=pathD(el);for(const h of (el.holes||[]))if(h&&h.length>2)d+=pathD({nodes:h,closed:true});return d;}
 function renderElement(el,exp){
   const k=st.view.k,sel=!exp&&st.sel.has(el.id),hw=(10/k),hl=6/k;
@@ -660,6 +676,12 @@ function renderElement(el,exp){
   if(el.type==='fill'){const d=fillD(el),col=colOf(el,FILL_COLORS[0][0]);s+=`<g${gid}>`;
     s+=`<path d="${d}" fill="${col}" fill-rule="evenodd" stroke="none"${exp?'':` pointer-events="${sel?'all':'none'}"`}/>`;
     if(sel)s+=`<path d="${d}" fill="none" stroke="${SELC}" stroke-width="${2/k}" stroke-dasharray="${6/k} ${4/k}" pointer-events="none"/>`;
+    s+='</g>';}
+  else if(el.type==='annot'){const d=pathD(el),col=colOf(el,INK),w=widthOf(el,W_TRAJ),ak=arrowK(w,W_SEP);s+=`<g${gid}>`;
+    if(sel)s+=`<path d="${d}" fill="none" stroke="${SELC}" stroke-opacity=".35" stroke-width="${hl+w-1.3}" stroke-linecap="round"/>`;
+    if(!exp)s+=`<path d="${d}" fill="none" stroke="transparent" stroke-width="${hw}"/>`;
+    s+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="${SW(w)}"${annotDash(el,w)}/>`;
+    for(const h of annotHeads(el,ak))s+=`<path d="${arrowHead(h.p,h.t,8*ak,6.2*ak)}" fill="${col}"/>`;
     s+='</g>';}
   else if(el.type==='traj'){const d=pathD(el),col=colOf(el,INK),w=trajWidth(el),ak=arrowK(w,W_SEP);s+=`<g${gid}>`;
     if(sel)s+=`<path d="${d}" fill="none" stroke="${SELC}" stroke-opacity=".35" stroke-width="${hl+w-1.3}" stroke-linecap="round"/>`;
@@ -714,7 +736,7 @@ function boundaryMarks(el,ak=1){const fl=flatten(el),out=[];if(fl.total<1)return
   for(let i=0;i<n;i++){const fr=el.closed?(i+0.5)/n:(n===1?0.5:(i+0.5)/n);const a=atArc(fl,fr),nn=crossDirAt(el,a.tan);
     const q=AS()*ak;out.push({a:vsub(a.p,vmul(nn,5*q)),b:vadd(a.p,vmul(nn,6*q)),h:vadd(a.p,vmul(nn,9*q)),n:nn,p:a.p});}
   return out;}
-const ORDER={fill:-1,boundary:0,cycle:1,traj:2,eq:3,label:4};
+const ORDER={fill:-1,boundary:0,cycle:1,traj:2,annot:2.5,eq:3,label:4};
 function renderScene(exp,only){let s='';
   const els=doc.elements.filter(e=>!only||only.has(e.id)).sort((a,b)=>(ORDER[a.type]??5)-(ORDER[b.type]??5));
   for(const el of els)s+=renderElement(el,exp);return s;}
@@ -867,13 +889,14 @@ const ICON={
  cycle:'<ellipse cx="14" cy="14" rx="10" ry="7.5" fill="none" stroke="#111" stroke-width="2"/><path d="M14 6.5l-4 -2.3v4.6z" fill="#111"/>',
  boundary:'<path d="M4 20C9 10 18 22 24 9" fill="none" stroke="#c26b00" stroke-width="1.8"/><path d="M9 13l-2-5M17 17l1-5" stroke="#c26b00" stroke-width="1.2"/><path d="M7 6.5l-1.6 3 2.9-.6zM18.4 10.5l-2 2.5 3 .3z" fill="#c26b00"/>',
  region:'<rect x="4" y="6" width="20" height="15" fill="none" stroke="#2f81f7" stroke-width="1.6" stroke-dasharray="3 2"/><path d="M9 17C12 10 16 15 20 9" fill="none" stroke="#111" stroke-width="1.4"/>',
+ annot:'<path d="M5 23V5M5 23H24" fill="none" stroke="#111" stroke-width="1.5"/><path d="M5 2.5l-2.6 4.5h5.2zM26.5 23l-4.5-2.6v5.2z" fill="#111"/><path d="M8 19C12 18 13 9 22 8" fill="none" stroke="#1f6feb" stroke-width="1.6" stroke-dasharray="3 2.2"/>',
  fill:'<path d="M3 24V12C9 8 12 15 17 11S24 6 25 6V24Z" fill="#dbe9ff"/><path d="M3 12C9 8 12 15 17 11S24 6 25 6" fill="none" stroke="#111" stroke-width="1.6"/><path d="M16 22l-4-4 5-5 4 4z" fill="#fff1bd" stroke="#333" stroke-width="1.2"/><path d="M21 17q2 3 0 4" fill="none" stroke="#1f6feb" stroke-width="1.5"/>',
  label:'<text x="14" y="20" text-anchor="middle" font-family="Times New Roman,serif" font-style="italic" font-size="17" fill="#111">x₁</text>'};
 const TOOLS=[
  ['select','Select / edit (V)','V'],['pan','Pan (H)','H'],null,
  ['traj','Trajectory, freehand (T)','T'],['pen','Trajectory, Bézier pen (P)','P'],null,
  ['sink','Sink (1)','1'],['source','Source (2)','2'],['saddle','Saddle (3)','3'],['sn','Saddle-node (4) – codim 1','4'],null,
- ['cycle','Periodic orbit (C) – click or draw a loop','C'],['boundary','Inflow/outflow boundary (B)','B'],['fill','Background fill (F) – tap inside a region, or draw a shape','F'],null,['label','Text label (L)','L'],['region','Region: copy a rectangle as image or sketch (G)','G']];
+ ['cycle','Periodic orbit (C) – click or draw a loop','C'],['boundary','Inflow/outflow boundary (B)','B'],['fill','Background fill (F) – tap inside a region, or draw a shape','F'],['annot','Annotation (A) – lines and arrows, never checked','A'],null,['label','Text label (L)','L'],['region','Region: copy a rectangle as image or sketch (G)','G']];
 function buildTools(){const box=$('tools');box.innerHTML='';
   for(const t of TOOLS){if(!t){const d=document.createElement('div');d.className='grp';box.appendChild(d);continue;}
     const b=document.createElement('button');b.title=t[1];b.dataset.tool=t[0];
@@ -890,6 +913,7 @@ const TOOLHINT={region:'Drag a rectangle, then choose Copy image or Copy sketch'
   traj:'Draw a trajectory in the direction of the flow; ends snap to targets',pen:'Click / click-drag to add nodes; finish with ✓, Enter, a double-click, a tap on the last node, or by ending on a snap target',
   sink:'Click to place a sink',source:'Click to place a source',saddle:'Click to place a saddle',sn:'Click to place a saddle-node',
   cycle:'Click for an ellipse, or draw a closed loop',boundary:'Draw a boundary curve (close the loop for a trapping region)',label:'Click to place a label',
+  annot:'Drag to draw freely (or straight with “Straight” on / Shift); tap to place corner points, finish with ✓, a tap on the last node, a double-tap or Enter',
   fill:'Tap inside a region to fill it with the active colour (tap a fill to recolour it; with “no colour” a tap removes it); drag to draw a shape'};
 function renderStatus(){$('stTool').textContent=TOOLHINT[st.tool]||'';const m=$('stMsg');m.textContent=st.msg||'';m.className='msg'+(st.msgBad?' bad':'');
   $('stPos').textContent=st.mouse?`x ${Math.round(st.mouse.x)}  y ${Math.round(-st.mouse.y)}`:'';}
@@ -917,6 +941,7 @@ svg.addEventListener('pointerdown',e=>{
   if(t==='traj'||t==='boundary'||t==='cycle'||t==='fill'){st.drag={type:'stroke',tool:t,pts:[p],color:t==='boundary'?BNDC:t==='fill'?'#6a717c':INK};
     if(t==='traj'){const m=findSnap(p,fakeTraj(p),'start');st.magnets=m?[m]:[];}return;}
   if(t==='pen')return downPen(e,p);
+  if(t==='annot'){if(st.pen)return downPen(e,p);st.drag={type:'stroke',tool:'annot',pts:[p],color:'#1f6feb',straight:st.annotStraight||e.shiftKey};return;}
   if(t==='sink'||t==='source'||t==='saddle'||t==='sn'){const before=snapshot();const q=gsnap(p);const el=mkEq(t,q.x,q.y);doc.elements.push(el);
     st.sel=new Set([el.id]);commit(before,'Placed '+EQNAME[t]);return;}
   if(t==='label'){const before=snapshot();const q=gsnap(p);const el=mkLabel(q.x,q.y,'$x$');doc.elements.push(el);st.sel=new Set([el.id]);
@@ -944,11 +969,13 @@ function downSelect(e,p){
 
 svg.addEventListener('pointermove',e=>{
   const p=toWorld(e);st.mouse=p;const d=st.drag;
-  if(!d){if(st.pen){st.pen.ghost={x:p.x,y:p.y,ix:0,iy:0,ox:0,oy:0};const m=penEndSnap(p);st.magnets=m?[m]:[];renderOverlay();}
+  if(!d){if(st.pen){let q=p;if(st.pen.kind==='annot'&&st.pen.nodes.length&&(st.annotStraight||e.shiftKey))q=straightFrom(st.pen.nodes[st.pen.nodes.length-1],gsnap(p));
+      st.pen.ghost={x:q.x,y:q.y,ix:0,iy:0,ox:0,oy:0};const m=st.pen.kind==='annot'?null:penEndSnap(p);st.magnets=m?[m]:[];renderOverlay();}
     else if(st.tool==='traj'||st.tool==='pen'){const m=findSnap(p,fakeTraj(p),'start');
       st.magnets=m&&!m.fail?[m]:[];renderOverlay();}
     renderStatus();return;}
   if(d.type==='pan'){st.view.x=d.vx-(e.clientX-d.sx)/st.view.k;st.view.y=d.vy-(e.clientY-d.sy)/st.view.k;schedule();return;}
+  if(d.type==='stroke'&&d.tool==='annot'&&(d.straight||e.shiftKey)){d.straight=true;d.pts=[d.pts[0],straightFrom(gsnap(d.pts[0]),gsnap(p))];renderOverlay();return;}
   if(d.type==='stroke'){const last=d.pts[d.pts.length-1];if(vdist(last,p)*st.view.k>=2)d.pts.push(p);
     if(d.tool==='traj'){const tmp=strokeTraj(d.pts,true);st.magnets=[];
       if(tmp){const a=findSnap(tmp.nodes[0],tmp,'start'),b=findSnap(p,tmp,'end');if(a)st.magnets.push(a);if(b)st.magnets.push(b);
@@ -998,7 +1025,7 @@ svg.addEventListener('pointerup',e=>{const d=st.drag;st.drag=null;
     if(d.moved)commit(d.before,d.which&&d.snap&&!d.snap.fail?(d.snap.join?'Trajectories joined':'Attached'):'Edited');else refresh();return;}
 });
 function onDouble(e){
-  if(st.tool==='pen'){finishPen(true);return;}
+  if(st.tool==='pen'||(st.tool==='annot'&&st.pen)){finishPen(true);return;}
   if(st.tool!=='select')return;const p=toWorld(e);
   const tgt=document.elementFromPoint(e.clientX,e.clientY)||e.target;
   const h=tgt.closest&&tgt.closest('[data-h]');
@@ -1054,6 +1081,10 @@ function strokeTraj(pts,preview){const k=st.view.k;if(pts.length<2)return null;
   const nodes=crNodes(s,false);return preview?{type:'traj',nodes,start:null,end:null}:mkTraj(nodes);}
 function closedNodes(pts){let tot=0;for(let i=1;i<pts.length;i++)tot+=vdist(pts[i],pts[i-1]);tot+=vdist(pts[0],pts[pts.length-1]);
   const n=clamp(Math.round(tot/45),6,16);return crNodes(resample(pts,n,true),true);}
+/* point b moved so that a→b is horizontal, vertical or diagonal (45°) */
+function straightFrom(a,b){const v=vsub(b,a),L=vlen(v);if(L<1e-9)return {x:b.x,y:b.y};
+  const ang=Math.round(Math.atan2(v.y,v.x)/(Math.PI/4))*(Math.PI/4),u={x:Math.cos(ang),y:Math.sin(ang)},l=vdot(v,u);
+  return {x:a.x+u.x*l,y:a.y+u.y*l};}
 function finishStroke(d){const k=st.view.k,pts=d.pts;const before=snapshot();
   let tot=0;for(let i=1;i<pts.length;i++)tot+=vdist(pts[i],pts[i-1]);
   if(d.tool==='fill'){
@@ -1062,6 +1093,15 @@ function finishStroke(d){const k=st.view.k,pts=d.pts;const before=snapshot();
     if(st.fillColor===ERASE){setMsg('“No colour” is active: tap a fill to remove it, or pick a colour to draw a fill',true);refresh();return;}
     const el=mkFill(closedNodes(pts),null,st.fillColor);doc.elements.push(el);
     commit(before,'Fill created');return;}
+  if(d.tool==='annot'){
+    if(tot*k<12){/* a tap starts a polyline: further taps add corner points */
+      const q=gsnap(pts[0]);st.pen={nodes:[{x:q.x,y:q.y,ix:0,iy:0,ox:0,oy:0,smooth:false}],before,kind:'annot'};updatePenBar();renderOverlay();
+      setMsg('Tap to add corner points (drag for a smooth one); finish with ✓, a tap on the last node, a double-tap or Enter; tap the first node to close');return;}
+    let el;
+    if(d.straight){const a=gsnap(pts[0]),b=pts[pts.length-1];el=mkAnnot([{x:a.x,y:a.y,ix:0,iy:0,ox:0,oy:0,smooth:false},{x:b.x,y:b.y,ix:0,iy:0,ox:0,oy:0,smooth:false}],false);}
+    else if(vdist(pts[0],pts[pts.length-1])*k<25&&tot*k>80)el=mkAnnot(closedNodes(pts),true);
+    else{const tr=strokeTraj(pts,true);if(!tr){refresh();return;}el=mkAnnot(tr.nodes,false);}
+    doc.elements.push(el);commit(before,'Annotation added – it is never checked; edit it with the Select tool');return;}
   if(d.tool==='cycle'){let el;
     if(tot*k<12){const q=gsnap(pts[0]);el=mkCycle(ellipseNodes(q.x,q.y,60,42),'stable');}
     else el=mkCycle(closedNodes(pts),'stable');
@@ -1089,7 +1129,7 @@ function fillBarriers(){const out=[];/* every curve bounds a fill: list of polyl
       /* ends bound to an orbit sit CYC_OFF away from it: close that gap */
       const onC=w=>{const bd=el[w];const tg=bd&&byId(bd.el);return tg&&tg.type==='cycle'?pathPt(tg,bd.t):null;};
       const a=onC('start'),z=onC('end');if(a)pts.unshift(a);if(z)pts.push(z);out.push(pts);}
-    else if(el.type==='cycle'||el.type==='boundary')out.push(flatten(el).pts);
+    else if(el.type==='cycle'||el.type==='boundary'||el.type==='annot')out.push(flatten(el).pts);
     else if(el.type==='eq')for(const q of eqPorts(el))if(q.dir&&!q.hidden)out.push([{x:el.x,y:el.y},q.pos]);}
   return out;}
 function fillAt(p){/* topmost existing fill containing p */
@@ -1176,6 +1216,12 @@ function penEndSnap(q){const pen=st.pen;if(!pen||!pen.nodes.length||!st.magnet)r
   const m=findSnap(q,{type:'traj',nodes,start:null,end:null},'end');return m&&!m.fail?m:null;}
 function downPen(e,p){if(!st.pen)st.pen={nodes:[],before:snapshot()};
   const nodes=st.pen.nodes;let q=gsnap(p);
+  if(st.pen.kind==='annot'){/* annotations: no snapping to elements; optional 45° constraint; tapping the first node closes the curve */
+    if(nodes.length&&(st.annotStraight||e.shiftKey))q=straightFrom(nodes[nodes.length-1],q);
+    const tol=st.coarse?16:5;
+    if(nodes.length&&vdist(nodes[nodes.length-1],q)*st.view.k<tol){if(nodes.length>=2)finishPen(true);return;}
+    if(nodes.length>=3&&vdist(nodes[0],q)*st.view.k<tol){st.pen.closed=true;finishPen(true);return;}
+    nodes.push({x:q.x,y:q.y,ix:0,iy:0,ox:0,oy:0,smooth:false});st.pen.finishOnUp=false;st.drag={type:'penhandle'};updatePenBar();renderOverlay();return;}
   if(nodes.length===0){const m=findSnap(q,fakeTraj(q),'start');if(m&&!m.fail)q=m.pos;}
   /* tapping the last node again finishes the curve (generous radius for pencil and finger) */
   if(nodes.length&&vdist(nodes[nodes.length-1],q)*st.view.k<(st.coarse?16:5)){if(nodes.length>=2)finishPen(true);return;}
@@ -1191,6 +1237,10 @@ $('penBar').addEventListener('click',e=>{const a=e.target.dataset&&e.target.data
 function finishPen(create){const pen=st.pen;st.pen=null;st.magnets=[];updatePenBar();if(!pen)return;
   const nodes=pen.nodes;while(nodes.length>1&&vdist(nodes[nodes.length-1],nodes[nodes.length-2])*st.view.k<4)nodes.pop();
   if(!create||nodes.length<2){refresh();return;}
+  if(pen.kind==='annot'){/* corner points stay corners: straight segments */
+    const el=mkAnnot(nodes.map(n=>({...n})),!!pen.closed&&nodes.length>=3);
+    if(el.closed){el.nodes[0].ix=el.nodes[0].iy=0;}else{el.nodes[0].ix=el.nodes[0].iy=0;const z=el.nodes[el.nodes.length-1];z.ox=z.oy=0;}
+    const before=snapshot();doc.elements.push(el);commit(before,'Annotation added – it is never checked; edit it with the Select tool');return;}
   /* corner points without handles get gentle automatic handles */
   for(let i=0;i<nodes.length;i++){const n=nodes[i];if(n.ox||n.oy||n.ix||n.iy)continue;
     const prev=nodes[i-1],next=nodes[i+1];if(next){const v=vmul(vsub(next,n),1/3);n.ox=v.x;n.oy=v.y;}if(prev){const v=vmul(vsub(prev,n),1/3);n.ix=v.x;n.iy=v.y;}}
@@ -1292,8 +1342,26 @@ function simplifySelected(){const els=selEls().filter(hasNodes);if(!els.length){
   const before=snapshot();let c=0;for(const el of els)if(simplifyEl(el))c++;st.selNode=null;
   if(!c){setMsg('Already as simple as it gets (delete nodes by hand if needed)');return;}
   commit(before,'Simplified – press S again to simplify further');}
-function reverseSelected(){const els=selEls().filter(e=>e.type==='traj'||e.type==='cycle'||e.type==='boundary');if(!els.length)return;
-  const before=snapshot();for(const el of els){if(el.type==='traj')reversePath(el);else el.dir=-(el.dir||1);}commit(before,'Direction reversed');}
+/* trajectory / orbit ⇄ annotation (keeps geometry, colour and width) */
+function convertSelected(toAnnot){const els=selEls();const before=snapshot();let n=0,detached=0;const newSel=new Set();
+  for(const el of els){let ne=null;
+    if(toAnnot&&(el.type==='traj'||el.type==='cycle')){
+      ne={id:doc.nextId++,type:'annot',nodes:structuredClone(el.nodes),closed:el.type==='cycle',dash:el.type==='cycle'&&el.stability==='unstable'?'dashed':'solid',
+        heads:el.type==='cycle'?((el.arrows??1)>0?'mid':'none'):((el.arrows??1)>0?'mid':'none')};
+      if(el.type==='cycle'&&(el.dir||1)<0)reversePath(ne);
+      if(el.type==='traj'){const f=Math.round(trajWidth(el)/BASE0*1000)/1000;if(f!==1)ne.lw=f;}
+      for(const o of doc.elements)if(o.type==='traj'&&o!==el)for(const w of ['start','end'])if(o[w]&&o[w].el===el.id){o[w]=null;detached++;}}
+    else if(!toAnnot&&el.type==='annot'){
+      if(el.closed){ne=mkCycle(structuredClone(el.nodes),el.dash==='dashed'?'unstable':'stable');}
+      else{ne=mkTraj(structuredClone(el.nodes));ne.arrows=el.heads==='none'?0:1;}}
+    if(!ne)continue;for(const k of ['color','lw','width'])if(el[k]!==undefined&&ne[k]===undefined)ne[k]=el[k];
+    if(!toAnnot&&ne.type==='traj'&&el.lw===undefined)delete ne.lw;
+    doc.elements.splice(doc.elements.indexOf(el),1,ne);newSel.add(ne.id);n++;}
+  if(!n){setMsg(toAnnot?'Select trajectories or periodic orbits to convert':'Select annotations to convert',true);return;}
+  st.sel=newSel;st.selNode=null;
+  commit(before,toAnnot?`Converted to annotation${n>1?'s':''} – no longer checked${detached?` (${detached} attached trajectory end${detached>1?'s':''} detached)`:''}`:`Converted – ${n>1?'they are':'it is'} checked again and can be attached`);}
+function reverseSelected(){const els=selEls().filter(e=>e.type==='traj'||e.type==='cycle'||e.type==='boundary'||e.type==='annot');if(!els.length)return;
+  const before=snapshot();for(const el of els){if(el.type==='traj'||el.type==='annot')reversePath(el);else el.dir=-(el.dir||1);}commit(before,'Direction reversed');}
 
 /* =====================================================================
    Panels
@@ -1305,8 +1373,8 @@ function bindingText(tr,w){const b=tr[w];if(!b)return 'free';const tg=byId(b.el)
   let s=elName(tg);if(b.port&&b.port!=='c')s+=' ('+({u1:'unstable sep.',u2:'unstable sep.',s1:'stable sep.',s2:'stable sep.',cm:'centre-manifold sep.',h1:'hyperbolic sep.',h2:'hyperbolic sep.'})[b.port]+')';
   if(b.side)s+=b.side>0?', inside':', outside';return s;}
 /* ---------- style controls (colour / line width), shared by single and multiple selections ---------- */
-const DEFCOL={traj:INK,cycle:INK,eq:INK,label:INK,boundary:BNDC,fill:FILL_COLORS[0][0]};
-const DEFW={cycle:W_CYC,boundary:W_BND};
+const DEFCOL={annot:INK,traj:INK,cycle:INK,eq:INK,label:INK,boundary:BNDC,fill:FILL_COLORS[0][0]};
+const DEFW={cycle:W_CYC,boundary:W_BND,annot:W_TRAJ};
 const fx=v=>'×'+(Math.round(v*100)/100);
 function swatches(cur,list,def,attr){const on=c=>(c||'').toLowerCase()===(cur||'').toLowerCase();
   let h=`<span class="sws">`;if(def!==null)h+=`<button class="sw def${!cur?' on':''}" ${attr}="" title="default colour" style="--c:${def}"></button>`;
@@ -1322,7 +1390,7 @@ function styleRows(els){let h='';const lineEls=els.filter(e=>e.type!=='fill'),fi
   if(lineEls.length){const cur=same(lineEls,e=>e.color||'');const defs=new Set(lineEls.map(e=>DEFCOL[e.type]));
     h+=row('Colour',swatches(cur===undefined?'#mixed':cur,LINE_COLORS,defs.size===1?[...defs][0]:INK,'data-color'));}
   if(fills.length){const cur=same(fills,e=>e.color||'');h+=row(lineEls.length?'Fill colour':'Colour',swatches(cur===undefined?'#mixed':cur,FILL_COLORS,null,'data-fcolor'));}
-  const pe=els.filter(isPath);
+  const pe=els.filter(e=>isPath(e)||e.type==='annot');
   if(pe.length){const w=same(pe,curWidth);const t=same(pe,e=>e.type);
     const defLbl=t==='traj'?`auto (${fx(W_SEP/BASE0)} separatrix, ×1 other)`:t?`default (${fx(DEFW[t]/BASE0)})`:'default';
     let opts=[['',defLbl],...WIDTHS.map(([v,l])=>[String(v),l])];
@@ -1334,7 +1402,7 @@ function applyStyle(kind,val){const els=selEls();if(!els.length)return;const bef
   for(const el of els){
     if(kind==='color'&&el.type!=='fill'){if(val)el.color=val;else delete el.color;n++;}
     else if(kind==='fcolor'&&el.type==='fill'){el.color=val;n++;}
-    else if(kind==='width'&&isPath(el)){if(val==='mixed')continue;delete el.weight;delete el.width;if(val==='')delete el.lw;else el.lw=parseFloat(val);n++;}}
+    else if(kind==='width'&&(isPath(el)||el.type==='annot')){if(val==='mixed')continue;delete el.weight;delete el.width;if(val==='')delete el.lw;else el.lw=parseFloat(val);n++;}}
   if(kind==='fcolor'&&val){st.fillColor=val;savePrefs();}
   if(!n){refresh();return;}st.panelDirty=true;commit(before,kind==='width'?'Line width changed':'Colour changed');}
 function fillToolRows(){const on=c=>(c||'').toLowerCase()===(st.fillColor||'').toLowerCase();
@@ -1347,6 +1415,11 @@ function fillToolRows(){const on=c=>(c||'').toLowerCase()===(st.fillColor||'').t
     <p class="hint">A region is bounded by all curves (trajectories, separatrices, orbits, boundaries), so a basin may need several taps. Regions that are not closed are cut at the edge of the view/drawing. Dragging draws a fill shape by hand. Fills are decoration only; to edit one in other ways, select it with the Select tool (click inside it).</p>`;}
 function renderPanel(){const box=$('props');const els=selEls();let h='';
   if(st.tool==='fill'){h+=fillToolRows();}
+  else if(st.tool==='annot'){h+=`<h3>Annotation tool</h3><p class="hint">Plain lines and arrows (axes, bifurcation branches, …). Like text, they never snap to the phase portrait and are never checked.</p>`+
+    row('Style',sel_('dash',st.annot.dash,[['solid','solid'],['dashed','dashed'],['dotted','dotted']]).replace('data-prop=','data-annotpref='))+
+    row('Arrowheads',sel_('heads',st.annot.heads,[['none','none'],['end','arrow at the end'],['both','arrows at both ends'],['mid','arrow in the middle']]).replace('data-prop=','data-annotpref='))+
+    row('Straight',`<label class="chk"><input type="checkbox" data-annotstraight${st.annotStraight?' checked':''}> horizontal / vertical / 45°</label>`)+
+    `<p class="hint"><b>Drag</b> to draw (a straight segment when <i>Straight</i> is on or Shift is held). <b>Tap</b> to start a polyline: each tap adds a corner (drag for a smooth node); finish with ✓ in the bar at the top, by tapping the last node, a double-tap or Enter; tapping the first node closes it. Style and arrowheads apply to the annotations drawn next; change existing ones with the Select tool.</p>`;}
   else if(!els.length){h=`<h3>Drawing</h3><p class="hint">Pick a tool on the left. Trajectories are drawn in the direction of the flow; their ends snap to equilibria, separatrix terminals, periodic orbits and boundaries.</p>
     <p class="hint">${doc.elements.length} element${doc.elements.length===1?'':'s'}. Mode: ${doc.structStable?'structurally stable (hyperbolic elements only)':'codimension-one elements allowed'}.</p>
     ${row('Arrow size',`<input type="range" data-docprop="arrowScale" min="0.6" max="2.5" step="0.05" value="${AS()}"><span style="flex:0 0 34px">${AS().toFixed(2)}</span>`)}
@@ -1366,14 +1439,16 @@ function renderPanel(){const box=$('props');const els=selEls();let h='';
         if(el.kind==='saddle')h+=row('Angle to stable (°)',num('spread',el.spread,5,10,170));
         h+=row('Separatrix stub',num('len',el.len,2,10,120));}
       h+=row('Position',`<span>${Math.round(el.x)}, ${Math.round(-el.y)}</span>`);}
+    else if(el.type==='annot'){h+=row('Style',sel_('dash',el.dash||'solid',[['solid','solid'],['dashed','dashed'],['dotted','dotted']]))+row('Arrowheads',sel_('heads',el.heads||'none',el.closed?[['none','none'],['mid','arrow in the middle']]:[['none','none'],['end','arrow at the end'],['both','arrows at both ends'],['mid','arrow in the middle']]));
+      h+=`<div class="btns"><button data-act="rev">Reverse (R)</button><button data-act="toDyn">Convert to ${el.closed?'periodic orbit':'trajectory'}</button></div><p class="hint">Annotations are never checked and do not snap to the phase portrait.</p>`;}
     else if(el.type==='traj'){h+=row('Start',`<span>${esc(bindingText(el,'start'))}</span>`)+row('End',`<span>${esc(bindingText(el,'end'))}</span>`);
       h+=row('Arrows',num('arrows',el.arrows,1,0,6));if(el.arrows===1)h+=row('Arrow position',`<input type="range" data-prop="arrowPos" min="0.05" max="0.95" step="0.01" value="${el.arrowPos}">`);
-      h+=`<div class="btns"><button data-act="rev">Reverse (R)</button>${el.start?'<button data-act="detS">Detach start</button>':''}${el.end?'<button data-act="detE">Detach end</button>':''}${canSplit(el)?'<button data-act="split">Split at node (X)</button>':''}</div>`;
+      h+=`<div class="btns"><button data-act="rev">Reverse (R)</button>${el.start?'<button data-act="detS">Detach start</button>':''}${el.end?'<button data-act="detE">Detach end</button>':''}${canSplit(el)?'<button data-act="split">Split at node (X)</button>':''}<button data-act="toAnnot">Convert to annotation</button></div>`;
       if(!canSplit(el))h+=`<p class="hint">To split the trajectory, click one of its inner square nodes (double-click the curve to add one), then press X.</p>`;}
     else if(el.type==='cycle'){const opts=[['stable','Stable'],['unstable','Unstable']];
       if(!doc.structStable||el.stability.startsWith('semi'))opts.push(['semi-inner','Semi-stable: attracts inside'],['semi-outer','Semi-stable: attracts outside']);
       h+=row('Stability',sel_('stability',el.stability,opts))+row('Arrows',num('arrows',el.arrows,1,0,8));
-      h+=`<div class="btns"><button data-act="rev">Reverse orientation (R)</button>${canSplit(el)?'<button data-act="split">Split at node (X)</button><button data-act="snic">Saddle-node here</button>':''}</div>`;
+      h+=`<div class="btns"><button data-act="rev">Reverse orientation (R)</button>${canSplit(el)?'<button data-act="split">Split at node (X)</button><button data-act="snic">Saddle-node here</button>':''}<button data-act="toAnnot">Convert to annotation</button></div>`;
       if(!canSplit(el))h+=`<p class="hint">To split the orbit (e.g. for a saddle-node on the orbit), click one of its square nodes (double-click the orbit to add one). Then <i>Split at node</i> opens it into a trajectory, and <i>Saddle-node here</i> also puts a saddle-node into the gap.</p>`;}
     else if(el.type==='boundary'){
       if(el.closed){const f=flatten(el),a=atArc(f,0.1);const inflow=pointInPoly(f.pts,vadd(a.p,vmul(crossDirAt(el,a.tan),2)));
@@ -1393,6 +1468,8 @@ $('props').addEventListener('change',e=>{const t=e.target;
   if(t.hasAttribute('data-fcolor-pick')){applyStyle('fcolor',t.value);return;}
   if(t.hasAttribute('data-toolfcolor-pick')){st.fillColor=t.value;savePrefs();st.panelDirty=true;refresh();return;}
   if(t.hasAttribute('data-stylewidth')){applyStyle('width',t.value);return;}
+  if(t.dataset.annotpref){st.annot={...st.annot,[t.dataset.annotpref]:t.value};savePrefs();setMsg('Applies to the annotations drawn next');return;}
+  if(t.hasAttribute('data-annotstraight')){st.annotStraight=t.checked;savePrefs();setMsg(t.checked?'Straight: segments snap to horizontal, vertical or 45°':'Straight off');return;}
   if(t.dataset.pref){st[t.dataset.pref]=t.value;savePrefs();setMsg('Freehand smoothing: '+t.value);return;}
   if(t.dataset.docprop){const before=st.textBefore||snapshot();st.textBefore=null;doc[t.dataset.docprop]=parseFloat(t.value);commit(before,t.dataset.docprop==='lineBase'?'Base line width changed':'Arrow size changed');return;}
   const prop=t.dataset.prop;if(!prop)return;const el=selEls()[0];if(!el)return;
@@ -1416,6 +1493,7 @@ $('props').addEventListener('click',e=>{const ds=e.target.dataset||{};
   const a=ds.act;if(!a)return;
   if(a==='back'||a==='front'){const el=selEls()[0];if(!el)return;const before=snapshot();doc.elements=doc.elements.filter(x=>x!==el);
     if(a==='back')doc.elements.unshift(el);else doc.elements.push(el);commit(before,a==='back'?'Sent to back':'Brought to front');return;}
+  if(a==='toAnnot'||a==='toDyn'){convertSelected(a==='toAnnot');return;}
   if(a==='snic'){const sn=st.selNode,el=sn&&byId(sn.id);if(el&&el.type==='cycle')splitCycle(el,sn.i,true);return;}
   if(a==='split')splitAtNode();else if(a==='simp')simplifySelected();else if(a==='del')deleteSelection();else if(a==='dup')duplicateSelection();else if(a==='rev')reverseSelected();
   else if(a==='detS'||a==='detE'){const el=selEls()[0];const before=snapshot();el[a==='detS'?'start':'end']=null;commit(before,'Detached');}});
@@ -1447,7 +1525,7 @@ document.addEventListener('keydown',e=>{
   if(k==='Delete'||k==='Backspace'){e.preventDefault();if(st.selNode)deleteNode();else deleteSelection();return;}
   if(k.startsWith('Arrow')&&st.sel.size){e.preventDefault();const s=(e.shiftKey?10:1)/st.view.k;const dx=k==='ArrowLeft'?-s:k==='ArrowRight'?s:0,dy=k==='ArrowUp'?-s:k==='ArrowDown'?s:0;
     const before=snapshot();for(const el of selEls())affine(el,{a:1,b:0,c:0,d:1,e:dx,f:dy});commit(before,'Nudged');return;}
-  const map={f:'fill',g:'region',v:'select',h:'pan',t:'traj',p:'pen','1':'sink','2':'source','3':'saddle','4':'sn',c:'cycle',b:'boundary',l:'label'};
+  const map={a:'annot',f:'fill',g:'region',v:'select',h:'pan',t:'traj',p:'pen','1':'sink','2':'source','3':'saddle','4':'sn',c:'cycle',b:'boundary',l:'label'};
   if(map[k.toLowerCase()]){setTool(map[k.toLowerCase()]);return;}
   if(k==='r'||k==='R'){reverseSelected();return;}
   if(k==='s'||k==='S'){simplifySelected();return;}
@@ -1688,6 +1766,10 @@ function tikz(){const S=50,X=p=>`(${(p.x/S).toFixed(3)},${(-p.y/S).toFixed(3)})`
   L.push(`  traj/.style={line width=${W(W_TRAJ*lb)}},sep/.style={line width=${W(W_SEP*lb)}},cyc/.style={line width=${W(W_CYC*lb)}},bnd/.style={line width=${W(W_BND*lb)},ppbnd}]`);
   const els=doc.elements.slice().sort((a,b)=>(ORDER[a.type]??5)-(ORDER[b.type]??5));
   for(const el of els){const cn=tc(el);
+    if(el.type==='annot'){const w=widthOf(el,W_TRAJ),ak=arrowK(w,W_SEP),da=annotDashArr(el,w);
+      const dp=da?(el.dash==='dotted'?`dash pattern=on 0pt off ${W(da[1])},line cap=round`:`dash pattern=on ${W(da[0])} off ${W(da[1])}`):'';
+      L.push(`\\draw${opt('line width='+W(w*lb),'line join=round',dp,cn)} ${pathT(el)};`);
+      for(const h of annotHeads(el,ak))L.push(head(h.p,h.t,8*ak,6.2*ak,cn));continue;}
     if(el.type==='fill'){const rings=[el.nodes,...(el.holes||[])].filter(r=>r&&r.length>2);
       L.push(`\\fill[${cn||'ppc0'},even odd rule] ${rings.map(r=>pathT({nodes:r,closed:true})).join(' ')};`);}
     else if(el.type==='boundary'){const w=widthOf(el,W_BND),ak=arrowK(w,W_BND),bc=cn||'ppbnd';L.push(`\\draw${opt('bnd',w!==W_BND&&'line width='+W(w*lb),cn)} ${pathT(el)};`);
@@ -1756,7 +1838,7 @@ $('cSS').onchange=e=>{const before=snapshot();doc.structStable=e.target.checked;
   st.undo.push(before);st.redo=[];autosave();st.panelDirty=true;setMsg(doc.structStable?'Structural stability enforced':'Codimension-one elements enabled (saddle-node, semi-stable orbits, saddle connections)');refresh();};
 $('bHelp').onclick=()=>openModal('helpModal');
 $('bExample').onclick=()=>{closeModals();loadDoc(exampleDoc());setMsg('Example loaded');};
-function savePrefs(){try{localStorage.setItem('phaseplane-prefs2',JSON.stringify({grid:st.grid,snapGrid:st.snapGrid,magnet:st.magnet,refuse:st.refuse,smoothing:st.smoothing,fillColor:st.fillColor,snTrans:st.snTrans}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem('phaseplane-prefs2',JSON.stringify({grid:st.grid,snapGrid:st.snapGrid,magnet:st.magnet,refuse:st.refuse,smoothing:st.smoothing,fillColor:st.fillColor,snTrans:st.snTrans,annot:st.annot,annotStraight:st.annotStraight}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('phaseplane-prefs2')||'null');if(p){Object.assign(st,p);}}catch(e){}
   $('cGrid').checked=st.grid;$('cSnapGrid').checked=st.snapGrid;$('cMagnet').checked=st.magnet;$('cRefuse').checked=st.refuse;}
 function layoutTools(){const t=$('tools');t.classList.remove('two');if(t.scrollHeight>t.clientHeight+1)t.classList.add('two');}

@@ -21,6 +21,7 @@ A browser tool for sketching qualitative phase portraits of planar flows, the ki
 | Periodic orbit | `C` | Click for an ellipse, or draw a closed loop. Stable = solid, unstable = dashed. Semi-stable (codim 1) = solid with a dashed shadow on the repelling side. Arrows show the orientation. |
 | Boundary | `B` | A transversal the flow crosses in one direction only, shown by small crossing arrows (dark orange by default). A closed loop is created as an *inflow* boundary (trapping region); flip it in the panel. |
 | Background fill | `F` | Colours a region, e.g. a basin of attraction (see *Background fills* below). |
+| Annotation | `A` | Plain lines and arrows: axes, bifurcation branches, pointers. Never snapped or checked (see *Annotations* below). |
 | Region | `G` | Drag a rectangle. A small bar offers **Copy image** (exactly that rectangle, as a PNG for other apps; curves are clipped at its edge) and **Copy sketch** (the elements lying completely inside, for pasting into this tool). `Esc` or ✕ cancels. |
 | Label | `L` | Click to place text. Inside `$…$`: `_` gives a subscript, `^` a superscript, and `\alpha`, `\Gamma`, … give Greek letters. TikZ receives the text verbatim. |
 
@@ -59,6 +60,18 @@ Setting a saddle-node's *Transversally* to **open (1-d, decided later)** draws i
 * The transversal terminals are hidden but still snap. Attaching a trajectory that **arrives** there makes the saddle-node transversally **stable**; one that **leaves** makes it transversally **unstable**. Trajectories already attached are moved to the matching 2-d terminals: on the filled side, the stub becomes the node sector. The glyph and the flow along the centre line stay as they were; for *unstable* the element is turned by 180°.
 * The panel can switch between *open*, *stable* and *unstable* directly. Switching back to *open* is refused while trajectories are attached to the transversal terminals.
 * New saddle-nodes take the transversal setting chosen last, so a series of 1-d saddle-nodes can be placed one after the other.
+
+## Annotations (lines that are never checked)
+
+The **Annotation** tool (`A`) draws plain curves for everything that is not part of the phase portrait itself, e.g. the axes and branches of a qualitative bifurcation diagram. Like text labels, annotations never snap to equilibria, orbits or trajectories, take no part in the consistency checks, and do not get attached. They do bound background fills.
+
+* **Drag** to draw a curve freehand.
+* **Straight** (checkbox in the right panel while the tool is active; on a keyboard also by holding Shift): a drag gives a straight segment, and polyline segments are kept horizontal, vertical or diagonal (45°). This is the tablet-friendly way to draw axes.
+* **Tap** to start a polyline. Each further tap adds a corner; drag while placing a point to pull out smooth handles. Finish with **✓ Finish** in the bar at the top, by tapping the last node again, with a double-tap, `Enter`, or by switching tool. Tapping the first node closes the curve. **↶ Node** / `Backspace` removes the last point; **✕** / `Esc` discards it.
+* **Style** (solid, dashed, dotted) and **Arrowheads** (none, at the end, at both ends, in the middle) in the tool panel apply to the annotations drawn next. An axis is a straight annotation with an arrow at the end. Change existing annotations with the Select tool: style, arrowheads, colour, line width, nodes, *Reverse* (flips the arrow direction).
+* **Convert:** the panel of a trajectory or periodic orbit has *Convert to annotation*, and an annotation has *Convert to trajectory* (or *to periodic orbit* if closed). This switches the checking off or on for individual curves. Converting a dashed closed annotation gives an unstable orbit, a solid one a stable orbit. Trajectories attached to a converted orbit become free.
+* Annotations go into all exports (SVG, PNG, PDF, TikZ).
+* Markers for a bifurcation diagram: sinks and sources without connections serve as filled and open dots.
 
 ## Colours and line widths
 

@@ -218,6 +218,30 @@ Changes:
 * New saddle-nodes get stub length `SN_LEN = 18` (was 30; other equilibria unchanged). Stub arrows are placed at `stubArrowAt(e) = max(0.58·len, R_EQ + 1.5 + 3.75·AS())`, which keeps them clear of the glyph for short stubs and is unchanged for the old lengths.
 * Compatibility: existing files (including saddle-nodes with stored `len: 30`) export identically to Round 21.
 
+### Round 23
+> It would be useful for adding other simple graphs (eg, qualitative bifurcation diagrams) if the consistency check feature could be switched off for some curves. Or alternatively add a curve/line type that is not consistency checked. First make a suggestion/feasibility proposal.
+
+Proposal: a separate plain-curve type rather than a "don't check" flag. A flagged trajectory would still snap, attach, get separatrix widths and be reversed by the magnet. A convert action covers "switch off for some curves".
+
+> Do a separate line tool. The snapping to other elements would be annoying.
+> Name "Annotation" is fine as it acts like text in relation to the phase portraits. An arrow-ended line is fine (but make sure that the the feature is accessible on a tablet with pen).
+
+Implemented:
+* Element `annot`: `{id, type:'annot', nodes, closed, dash ∈ {solid,dashed,dotted}, heads ∈ {none,end,both,mid}}` plus the optional `color` and `lw`.
+  * `hasNodes` includes it and `isPath` does not, so it is outside validation, the magnet and bindings. `fillBarriers` includes it.
+  * `ORDER.annot = 2.5`, i.e. above trajectories and below equilibria.
+* Rendering: `annotDashArr` (dashed 6/4 and dotted 0.01/2.6·w, round caps, scaled with width) and `annotHeads` (end arrows have their tip exactly at the end point, mid = one arrow at half arc length), shared by SVG and TikZ. PDF uses its existing dash and linecap support.
+* Tool `annot` (key `A`):
+  * a drag is freehand (`strokeTraj` fit; closed when the ends meet, as for boundaries);
+  * with `st.annotStraight` (a panel checkbox, so it is reachable on a tablet) or Shift, a drag is a straight segment snapped by `straightFrom` to multiples of 45°;
+  * a tap starts a pen session with `st.pen.kind = 'annot'`. That session reuses the pen bar, tap-last-node, double-tap, Enter and tool-switch finishing, but has no start/end snapping, and its corners stay corners (no automatic handles). Tapping the first node (≥ 3 nodes) closes the curve.
+* Tool defaults `st.annot = {dash, heads}` (default solid with an end arrow) and `st.annotStraight` are stored in preferences. As with the fill tool, they apply to the annotations drawn next, and new annotations are not selected.
+* The element panel has Style, Arrowheads, Colour, Line width, Reverse and *Convert to trajectory/periodic orbit*. Trajectory and orbit panels have *Convert to annotation* (`convertSelected`):
+  * geometry, `color` and `lw` are kept; a separatrix keeps its width as `lw`;
+  * an unstable orbit becomes dashed; arrows become `heads: 'mid'`;
+  * bindings to a converted orbit are cleared.
+* Compatibility: existing files export identically to Round 22. Round 22 opens files with annotations without errors but does not draw them.
+
 ---
 
 ## 2. Feasibility assessment (agreed scope)
@@ -289,6 +313,7 @@ Element types:
 | `boundary` | `id, nodes[], closed (bool), dir (±1), spacing (crossing-arrow spacing, default 36)` |
 | `label` | `id, x, y, text, size (default 16)` |
 | `fill` | `id, nodes[] (outer ring), closed:true, holes (optional array of node arrays), color` |
+| `annot` | `id, nodes[], closed, dash (solid/dashed/dotted), heads (none/end/both/mid)` (Round 23; plus optional `color`, `lw`) |
 
 Optional on every element (Round 17): `color` (hex string; missing = default ink `#111`, boundaries `#c26b00` since Round 18; for saddles and saddle-nodes only the centre glyph). Optional on `traj`, `cycle` and `boundary`: `lw`, the width as a multiple of the base (Round 18). The older `width` (absolute px at base 1.3, Round 17) is still read when `lw` is missing, then the legacy trajectory `weight`. Setting a width from the panel writes `lw` and deletes `width` and `weight`.
 
